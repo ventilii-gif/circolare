@@ -242,6 +242,109 @@
     font-weight: 500;
     vertical-align: middle;
   }
+  .quiz-block {
+    margin-top: 28px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .quiz-block h3 {
+    margin: 0 0 16px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--ink);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .quiz-block h3::before {
+    content: "?";
+    display: inline-block;
+    width: 22px; height: 22px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    text-align: center; line-height: 22px;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .quiz-list { list-style: none; padding: 0; margin: 0; }
+  .quiz-q {
+    padding: 14px 0;
+    border-top: 1px solid var(--line);
+  }
+  .quiz-q:first-child { border-top: none; padding-top: 0; }
+  .quiz-prompt {
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+  .quiz-prompt .qn {
+    display: inline-block;
+    background: #eef2ff;
+    color: #4338ca;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-right: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .quiz-prompt .qn.calc { background: #ecfeff; color: #0e7490; }
+  .quiz-opts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  @media (max-width: 640px) { .quiz-opts { grid-template-columns: 1fr; } }
+  .quiz-opts button {
+    text-align: left;
+    background: white;
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.88rem;
+    color: var(--ink);
+    transition: all 0.12s;
+  }
+  .quiz-opts button:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .quiz-opts button:disabled { cursor: default; }
+  .quiz-opts button.ok {
+    background: #ecfdf5;
+    border-color: var(--ok);
+    color: var(--ok);
+    font-weight: 600;
+  }
+  .quiz-opts button.ko {
+    background: #fef2f2;
+    border-color: #dc2626;
+    color: #dc2626;
+  }
+  .quiz-feedback {
+    margin-top: 10px;
+    font-size: 0.87rem;
+    padding: 8px 12px;
+    border-radius: 6px;
+    display: none;
+    line-height: 1.5;
+  }
+  .quiz-feedback.ok {
+    display: block;
+    background: #ecfdf5;
+    border-left: 3px solid var(--ok);
+    color: #065f46;
+  }
+  .quiz-feedback.ko {
+    display: block;
+    background: #fef2f2;
+    border-left: 3px solid #dc2626;
+    color: #991b1b;
+  }
 </style>
 </head>
 <body>
@@ -581,8 +684,13 @@ goStep(1);
 function fitCanvas(cv) {
   const dpr = window.devicePixelRatio || 1;
   const rect = cv.getBoundingClientRect();
-  cv.width = Math.round(rect.width * dpr);
-  cv.height = Math.round(rect.height * dpr);
+  if (rect.width === 0 || rect.height === 0) return null;
+  const needW = Math.round(rect.width * dpr);
+  const needH = Math.round(rect.height * dpr);
+  if (cv.width !== needW || cv.height !== needH) {
+    cv.width = needW;
+    cv.height = needH;
+  }
   const ctx = cv.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return ctx;
@@ -629,7 +737,7 @@ function now() { return (performance.now() - t0) / 1000; }
   btnR.addEventListener("click", () => { phase = 0; });
 
   function draw() {
-    if (!ctx) ctx = fitCanvas(cv);
+    const _c = fitCanvas(cv); if (!_c) { lastT = now(); requestAnimationFrame(draw); return; } ctx = _c;
     const rect = cv.getBoundingClientRect();
     const W = rect.width, H = rect.height;
     ctx.clearRect(0, 0, W, H);
@@ -687,7 +795,7 @@ function now() { return (performance.now() - t0) / 1000; }
   btn.addEventListener("click", () => { playing.vect = !playing.vect; btn.textContent = playing.vect ? "Pausa" : "Play"; });
 
   function draw() {
-    if (!ctx) ctx = fitCanvas(cv);
+    const _c = fitCanvas(cv); if (!_c) { lastT = now(); requestAnimationFrame(draw); return; } ctx = _c;
     const rect = cv.getBoundingClientRect();
     const W = rect.width, H = rect.height;
     ctx.clearRect(0, 0, W, H);
@@ -697,6 +805,7 @@ function now() { return (performance.now() - t0) / 1000; }
     const t = now();
     if (playing.vect) phase += (t - lastT) * w;
     lastT = t;
+
     ctx.strokeStyle = "#cfd4dc"; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(cx, cy, r*scale, 0, Math.PI*2); ctx.stroke();
     ctx.strokeStyle = "#eee";
@@ -759,8 +868,9 @@ function now() { return (performance.now() - t0) / 1000; }
   let phase = 0, lastT = now();
 
   function draw() {
-    if (!ctx) ctx = fitCanvas(cv);
-    if (!ctxP) ctxP = fitCanvas(cp);
+    const _c = fitCanvas(cv); const _p = fitCanvas(cp);
+    if (!_c || !_p) { lastT = now(); requestAnimationFrame(draw); return; }
+    ctx = _c; ctxP = _p;
     const rect = cv.getBoundingClientRect();
     const W = rect.width, H = rect.height;
     ctx.clearRect(0, 0, W, H);
@@ -880,8 +990,9 @@ function now() { return (performance.now() - t0) / 1000; }
   let phase = 0, lastT = now();
 
   function draw() {
-    if (!ctxA) ctxA = fitCanvas(cvA);
-    if (!ctxP) ctxP = fitCanvas(cvP);
+    const _a = fitCanvas(cvA); const _p = fitCanvas(cvP);
+    if (!_a || !_p) { lastT = now(); requestAnimationFrame(draw); return; }
+    ctxA = _a; ctxP = _p;
     const A = +sA.value, w = +sW.value;
     const t = now();
     if (playing.deriv) phase += (t - lastT) * w;
@@ -1026,8 +1137,9 @@ function now() { return (performance.now() - t0) / 1000; }
   }
 
   function draw() {
-    if (!ctx) ctx = fitCanvas(cv);
-    if (!ctxP) ctxP = fitCanvas(cp);
+    const _c = fitCanvas(cv); const _p = fitCanvas(cp);
+    if (!_c || !_p) { lastT = now(); requestAnimationFrame(draw); return; }
+    ctx = _c; ctxP = _p;
     const m = +sM.value, k = +sK.value, A = +sA.value;
     const w = Math.sqrt(k/m);
     const Tper = 2*Math.PI/w;
@@ -1159,8 +1271,9 @@ function now() { return (performance.now() - t0) / 1000; }
   resetExact();
 
   function draw() {
-    if (!ctx) ctx = fitCanvas(cv);
-    if (!ctxP) ctxP = fitCanvas(cp);
+    const _c = fitCanvas(cv); const _p = fitCanvas(cp);
+    if (!_c || !_p) { lastT = now(); requestAnimationFrame(draw); return; }
+    ctx = _c; ctxP = _p;
     const L = +sL.value, g = +sG.value, th0 = (+sTh.value) * Math.PI/180;
     const w = Math.sqrt(g/L);
     const Tper = 2*Math.PI/w;
@@ -1296,7 +1409,7 @@ function now() { return (performance.now() - t0) / 1000; }
   }
 
   function draw() {
-    if (!ctx) ctx = fitCanvas(cv);
+    const _c = fitCanvas(cv); if (!_c) { lastT = now(); requestAnimationFrame(draw); return; } ctx = _c;
     const rect = cv.getBoundingClientRect();
     const W = rect.width, H = rect.height;
     ctx.clearRect(0, 0, W, H);
@@ -1377,6 +1490,272 @@ function now() { return (performance.now() - t0) / 1000; }
   }
   requestAnimationFrame(draw);
 })();
+
+// ============================================================
+//  QUIZZES — 6 per section (theory + calculation)
+// ============================================================
+const QUIZZES = {
+  1: [
+    { type: "T", q: "Cosa significa che il moto circolare è <em>uniforme</em>?",
+      opts: [
+        "Il vettore velocità è costante",
+        "Il modulo della velocità è costante, la direzione cambia",
+        "L'accelerazione è zero",
+        "Il punto percorre archi uguali solo in tempi diversi"
+      ], correct: 1,
+      exp: "Uniforme significa $|\\vec v|$ costante. La direzione di $\\vec v$ cambia continuamente, e questa variazione è proprio ciò che genera l'accelerazione centripeta." },
+    { type: "C", q: "Una ruota compie 120 giri al minuto. Quanto vale $\\omega$?",
+      opts: ["$2\\pi$ rad/s", "$4\\pi$ rad/s", "$120$ rad/s", "$\\pi/30$ rad/s"], correct: 1,
+      exp: "$f = 120/60 = 2$ Hz, quindi $\\omega = 2\\pi f = 4\\pi \\approx 12{,}57$ rad/s." },
+    { type: "C", q: "Se $\\omega = \\pi$ rad/s, quanto vale il periodo $T$?",
+      opts: ["$\\pi$ s", "$1/\\pi$ s", "$2$ s", "$1/2$ s"], correct: 2,
+      exp: "$T = 2\\pi/\\omega = 2\\pi/\\pi = 2$ s." },
+    { type: "T", q: "In un MCU l'accelerazione è diretta...",
+      opts: ["Tangente alla traiettoria", "Verso il centro", "Lungo $\\vec v$", "Verso l'esterno"], correct: 1,
+      exp: "L'accelerazione è puramente centripeta: $\\vec a = -\\omega^2 \\vec r$, sempre verso $O$." },
+    { type: "C", q: "Con $r=2$ m e $\\omega = 3$ rad/s, l'accelerazione centripeta è:",
+      opts: ["$6$ m/s²", "$12$ m/s²", "$18$ m/s²", "$9$ m/s²"], correct: 2,
+      exp: "$a_c = \\omega^2 r = 9 \\cdot 2 = 18$ m/s²." },
+    { type: "C", q: "Raggio $r=0{,}5$ m, periodo $T=4$ s. Velocità tangenziale $v$?",
+      opts: ["$\\approx 0{,}79$ m/s", "$2$ m/s", "$\\approx 0{,}25$ m/s", "$\\pi$ m/s"], correct: 0,
+      exp: "$v = \\omega r = (2\\pi/T) r = (2\\pi/4)\\cdot 0{,}5 = \\pi/4 \\approx 0{,}785$ m/s." }
+  ],
+  2: [
+    { type: "T", q: "Perché $\\vec v \\perp \\vec r$ in ogni istante?",
+      opts: [
+        "Perché $\\vec v$ è la derivata di $\\vec r$ rispetto al tempo, e per modulo costante deve essere ortogonale",
+        "È una coincidenza geometrica del cerchio",
+        "Perché $\\vec a$ è centripeta",
+        "Vale solo all'istante iniziale"
+      ], correct: 0,
+      exp: "Da $|\\vec r|^2 = r^2$ costante, derivando: $2\\vec r \\cdot \\vec v = 0$. Quindi $\\vec v$ è sempre tangente." },
+    { type: "T", q: "Perché $\\vec a$ punta verso il centro?",
+      opts: [
+        "Perché $|\\vec v|$ aumenta verso il centro",
+        "Perché la sola variazione di $\\vec v$ è di direzione, e la rotazione di un vettore di modulo costante è ortogonale a esso",
+        "Per simmetria del cerchio",
+        "Perché c'è una forza esterna verso il centro per definizione"
+      ], correct: 1,
+      exp: "Da $|\\vec v|$ costante, derivando $|\\vec v|^2 = $ cost si ha $\\vec v \\cdot \\vec a = 0$: $\\vec a$ è ortogonale a $\\vec v$, cioè radiale. Il segno (verso il centro) si vede da $\\vec a = -\\omega^2 \\vec r$." },
+    { type: "C", q: "Con $\\omega = 2$ rad/s e $r = 0{,}5$ m, $|\\vec a|$ vale:",
+      opts: ["$1$ m/s²", "$2$ m/s²", "$0{,}5$ m/s²", "$4$ m/s²"], correct: 1,
+      exp: "$|\\vec a| = \\omega^2 r = 4 \\cdot 0{,}5 = 2$ m/s²." },
+    { type: "C", q: "Quanto vale il rapporto $|\\vec a|/|\\vec v|$ per un MCU?",
+      opts: ["$\\omega^2$", "$\\omega$", "$r$", "$1/\\omega$"], correct: 1,
+      exp: "$|\\vec a|/|\\vec v| = \\omega^2 r / (\\omega r) = \\omega$." },
+    { type: "T", q: "Se $\\omega$ raddoppia (a parità di $r$), $|\\vec a|$ diventa:",
+      opts: ["Doppia", "Quadrupla", "Metà", "Invariata"], correct: 1,
+      exp: "$a \\propto \\omega^2$: raddoppia $\\omega$ → moltiplica $a$ per $4$." },
+    { type: "C", q: "Con $v = 10$ m/s e $r = 2$ m, l'accelerazione centripeta è:",
+      opts: ["$5$ m/s²", "$20$ m/s²", "$50$ m/s²", "$100$ m/s²"], correct: 2,
+      exp: "$a_c = v^2/r = 100/2 = 50$ m/s²." }
+  ],
+  3: [
+    { type: "T", q: "Cos'è il moto armonico semplice come <em>proiezione</em>?",
+      opts: [
+        "La proiezione di un MCU su un suo diametro",
+        "La proiezione di un MCU sul centro",
+        "Il moto di un punto che accelera in modo costante",
+        "Un moto oscillatorio qualsiasi"
+      ], correct: 0,
+      exp: "Geometricamente: l'ombra di un punto in MCU su un qualunque diametro descrive un MAS." },
+    { type: "T", q: "Nell'equazione $x(t)=A\\cos(\\omega t + \\varphi_0)$, l'ampiezza $A$ corrisponde a:",
+      opts: ["La pulsazione del MCU", "Il raggio del cerchio sorgente", "Il diametro del cerchio", "L'intera lunghezza percorsa in un periodo"], correct: 1,
+      exp: "$A = r$: la proiezione raggiunge i punti estremi del diametro, distanti $r$ dal centro." },
+    { type: "C", q: "Per $x(t)=3\\cos(2t)$, quanto vale $x$ in $t=0$?",
+      opts: ["$0$", "$3$", "$-3$", "$2$"], correct: 1,
+      exp: "$x(0) = 3\\cos(0) = 3$." },
+    { type: "C", q: "Stessa funzione, $x(t)=3\\cos(2t)$, quanto vale $x$ in $t = \\pi/4$?",
+      opts: ["$3$", "$\\sqrt{3}$", "$0$", "$-3$"], correct: 2,
+      exp: "$x(\\pi/4) = 3\\cos(\\pi/2) = 0$." },
+    { type: "T", q: "Cambiare solo $\\varphi_0$ produce:",
+      opts: [
+        "Un MAS con periodo diverso",
+        "Un MAS con ampiezza diversa",
+        "Lo stesso MAS, traslato nel tempo",
+        "Un moto non armonico"
+      ], correct: 2,
+      exp: "$\\varphi_0$ corrisponde a una traslazione temporale: $A\\cos(\\omega(t+\\varphi_0/\\omega))$." },
+    { type: "C", q: "Periodo di $x(t) = A\\cos(5t)$?",
+      opts: ["$5$ s", "$2\\pi$ s", "$\\approx 1{,}26$ s", "$\\pi$ s"], correct: 2,
+      exp: "$T = 2\\pi/\\omega = 2\\pi/5 \\approx 1{,}257$ s." }
+  ],
+  4: [
+    { type: "C", q: "Per $x(t)=A\\cos(\\omega t)$, quanto vale $v(0)$?",
+      opts: ["$A\\omega$", "$0$", "$-A\\omega$", "$A$"], correct: 1,
+      exp: "$v(t) = -A\\omega\\sin(\\omega t)$ e $\\sin(0) = 0$, quindi $v(0)=0$. (Punto all'estremo: velocità nulla, accelerazione massima.)" },
+    { type: "C", q: "Stessa $x(t)$: quanto vale $a(0)$?",
+      opts: ["$0$", "$-A\\omega$", "$-A\\omega^2$", "$+A\\omega^2$"], correct: 2,
+      exp: "$a(t) = -A\\omega^2 \\cos(\\omega t)$, in $t=0$ vale $-A\\omega^2$." },
+    { type: "T", q: "Quale relazione caratterizza il MAS?",
+      opts: [
+        "$\\ddot x = \\omega x$",
+        "$\\ddot x = -\\omega^2 x$",
+        "$\\dot x = -\\omega x$",
+        "$\\ddot x = -\\omega^2 x^2$"
+      ], correct: 1,
+      exp: "$\\ddot x = -\\omega^2 x$: accelerazione proporzionale e opposta allo spostamento." },
+    { type: "T", q: "Una <em>forza di richiamo</em> è una forza che...",
+      opts: [
+        "Aumenta con la distanza dall'equilibrio in modo qualsiasi",
+        "È sempre rivolta verso l'equilibrio e proporzionale allo spostamento",
+        "Si oppone solo alla velocità",
+        "È costante in modulo"
+      ], correct: 1,
+      exp: "Una forza di richiamo lineare ha la forma $F = -kx$: punta sempre verso $x=0$ e cresce linearmente con $|x|$." },
+    { type: "C", q: "Se $\\omega = 10$ rad/s e $m = 2$ kg, la costante elastica equivalente è $k =$",
+      opts: ["$20$ N/m", "$100$ N/m", "$200$ N/m", "$5$ N/m"], correct: 2,
+      exp: "$k = m\\omega^2 = 2 \\cdot 100 = 200$ N/m." },
+    { type: "T", q: "Il periodo di un MAS dipende dall'ampiezza?",
+      opts: ["Sì, cresce con l'ampiezza", "Sì, decresce con l'ampiezza", "No, è indipendente (isocronismo)", "Solo se $\\omega$ è piccola"], correct: 2,
+      exp: "$T = 2\\pi/\\omega$ non contiene $A$: l'isocronismo è proprio del MAS." }
+  ],
+  5: [
+    { type: "C", q: "Massa $m=2$ kg, $k=8$ N/m. Periodo?",
+      opts: ["$\\pi/2$ s", "$\\pi$ s", "$2\\pi$ s", "$4$ s"], correct: 1,
+      exp: "$T = 2\\pi\\sqrt{m/k} = 2\\pi\\sqrt{2/8} = 2\\pi \\cdot 1/2 = \\pi \\approx 3{,}14$ s." },
+    { type: "C", q: "Stessa molla, la massa raddoppia. Il nuovo periodo è:",
+      opts: ["$T/\\sqrt 2$", "$T \\cdot \\sqrt 2$", "$2T$", "Invariato"], correct: 1,
+      exp: "$T \\propto \\sqrt m$: raddoppiare $m$ moltiplica $T$ per $\\sqrt 2 \\approx 1{,}414$." },
+    { type: "C", q: "Stessa massa, $k$ quadruplica. Il nuovo periodo è:",
+      opts: ["$T/2$", "$T/4$", "$2T$", "Invariato"], correct: 0,
+      exp: "$T \\propto 1/\\sqrt k$: $k \\to 4k$ dà $T \\to T/\\sqrt 4 = T/2$." },
+    { type: "T", q: "Il periodo della molla dipende dall'ampiezza $A$?",
+      opts: ["Sì, linearmente", "Sì, quadraticamente", "No (entro il limite elastico)", "Solo per piccole oscillazioni"], correct: 2,
+      exp: "L'oscillatore armonico è perfettamente isocrono: $T = 2\\pi\\sqrt{m/k}$, niente $A$." },
+    { type: "C", q: "Se $m = 0{,}5$ kg e $T = 1$ s, quanto vale $k$?",
+      opts: ["$\\approx 19{,}7$ N/m", "$\\approx 9{,}9$ N/m", "$\\approx 4\\pi^2$ N/m", "$2\\pi$ N/m"], correct: 0,
+      exp: "$k = 4\\pi^2 m/T^2 = 4\\pi^2 \\cdot 0{,}5 / 1 \\approx 19{,}74$ N/m." },
+    { type: "T", q: "Da cosa nasce il segno meno nella legge $F = -kx$?",
+      opts: [
+        "Dalla scelta del sistema di riferimento",
+        "Dal fatto che la forza si oppone allo spostamento dall'equilibrio",
+        "Dal segno della massa",
+        "È convenzionale e potrebbe essere positivo"
+      ], correct: 1,
+      exp: "$F$ punta sempre verso $x = 0$: se $x > 0$ allora $F < 0$ e viceversa, da cui il segno meno." }
+  ],
+  6: [
+    { type: "C", q: "Pendolo con $L = 1$ m e $g = 9{,}81$ m/s². Periodo?",
+      opts: ["$\\approx 1{,}00$ s", "$\\approx 2{,}01$ s", "$\\approx 3{,}14$ s", "$\\approx 0{,}50$ s"], correct: 1,
+      exp: "$T = 2\\pi\\sqrt{L/g} = 2\\pi\\sqrt{1/9{,}81} \\approx 2{,}006$ s." },
+    { type: "C", q: "Per avere $T = 2$ s su Terra ($g = 9{,}81$), serve $L \\approx$",
+      opts: ["$\\approx 0{,}99$ m", "$2$ m", "$\\approx 0{,}5$ m", "$4$ m"], correct: 0,
+      exp: "$L = g(T/2\\pi)^2 = 9{,}81 \\cdot (1/\\pi)^2 \\approx 0{,}994$ m." },
+    { type: "T", q: "Il periodo del pendolo semplice (piccoli angoli) dipende da:",
+      opts: [
+        "$L$, $g$ e $m$",
+        "Solo $L$ e $g$",
+        "$L$ e ampiezza $\\theta_0$",
+        "$m$ e ampiezza $\\theta_0$"
+      ], correct: 1,
+      exp: "La massa $m$ si semplifica in $mL\\ddot\\theta = -mg\\sin\\theta$. L'ampiezza non compare solo nell'approssimazione lineare." },
+    { type: "T", q: "Perché l'approssimazione $\\sin\\theta \\approx \\theta$ funziona per piccoli angoli?",
+      opts: [
+        "Perché $\\cos\\theta \\approx 1$",
+        "Perché lo sviluppo di Taylor di $\\sin\\theta$ in $\\theta=0$ è $\\theta - \\theta^3/6 + \\dots$ e i termini superiori sono trascurabili",
+        "Perché il pendolo è geometricamente piatto",
+        "È solo una convenzione storica"
+      ], correct: 1,
+      exp: "$\\sin\\theta = \\theta - \\theta^3/6 + O(\\theta^5)$: per $\\theta$ piccolo (radianti) il termine $\\theta^3/6$ è molto minore di $\\theta$." },
+    { type: "C", q: "Se $L$ raddoppia, il nuovo periodo $T'$ è:",
+      opts: ["$2T$", "$T\\sqrt 2$", "$T/2$", "$T/\\sqrt 2$"], correct: 1,
+      exp: "$T \\propto \\sqrt L$: raddoppia $L$ → $T$ cresce di $\\sqrt 2 \\approx 1{,}414$." },
+    { type: "C", q: "Sulla Luna ($g \\approx 1{,}62$ m/s²) un pendolo $L = 1$ m oscilla con $T \\approx$",
+      opts: ["$\\approx 2{,}0$ s", "$\\approx 4{,}94$ s", "$\\approx 1{,}0$ s", "$\\approx 9{,}81$ s"], correct: 1,
+      exp: "$T = 2\\pi\\sqrt{1/1{,}62} \\approx 4{,}94$ s, cioè $\\sqrt{9{,}81/1{,}62} \\approx 2{,}46$ volte più lento che sulla Terra." }
+  ],
+  7: [
+    { type: "T", q: "Cosa hanno in comune molla e pendolo?",
+      opts: [
+        "Stessa equazione del MAS, $\\ddot x = -\\omega^2 x$",
+        "Stessa costante $k$",
+        "Stesso periodo a parità di massa",
+        "Stessa origine fisica della forza di richiamo"
+      ], correct: 0,
+      exp: "Entrambi obbediscono a $\\ddot x = -\\omega^2 x$: cambia solo cosa rende $\\omega^2$ ($k/m$ vs $g/L$)." },
+    { type: "T", q: "Cosa cambia tra molla e pendolo?",
+      opts: [
+        "La forma matematica dell'oscillazione",
+        "Il significato fisico di $\\omega^2$",
+        "Il fatto che siano isocroni",
+        "Niente: sono sistemi identici"
+      ], correct: 1,
+      exp: "La forma è la stessa; ciò che cambia è il contenuto di $\\omega^2$: rigidezza elastica nella molla, geometria gravitazionale nel pendolo." },
+    { type: "C", q: "Molla con $k=10$ N/m, $m=0{,}25$ kg. $\\omega \\approx$",
+      opts: ["$6{,}32$ rad/s", "$2{,}5$ rad/s", "$40$ rad/s", "$\\pi$ rad/s"], correct: 0,
+      exp: "$\\omega = \\sqrt{k/m} = \\sqrt{40} \\approx 6{,}32$ rad/s." },
+    { type: "C", q: "Pendolo $L=2{,}5$ m, $g=10$ m/s². $\\omega = $",
+      opts: ["$4$ rad/s", "$2$ rad/s", "$0{,}25$ rad/s", "$2{,}5$ rad/s"], correct: 1,
+      exp: "$\\omega = \\sqrt{g/L} = \\sqrt{10/2{,}5} = \\sqrt 4 = 2$ rad/s." },
+    { type: "T", q: "Raddoppiando la massa, come cambiano i periodi?",
+      opts: [
+        "Entrambi crescono di $\\sqrt 2$",
+        "Solo la molla cresce di $\\sqrt 2$, il pendolo è invariato",
+        "Entrambi restano invariati",
+        "Solo il pendolo cresce di $\\sqrt 2$"
+      ], correct: 1,
+      exp: "$T_\\text{molla} = 2\\pi\\sqrt{m/k}$ cresce con $m$; $T_\\text{pend} = 2\\pi\\sqrt{L/g}$ non dipende da $m$." },
+    { type: "C", q: "Per un MAS $x(t) = 0{,}1\\cos(4t)$, la velocità massima è:",
+      opts: ["$0{,}1$ m/s", "$0{,}4$ m/s", "$1{,}6$ m/s", "$4$ m/s"], correct: 1,
+      exp: "$v_\\max = A\\omega = 0{,}1 \\cdot 4 = 0{,}4$ m/s. L'accelerazione massima sarebbe invece $A\\omega^2 = 1{,}6$ m/s²." }
+  ]
+};
+
+function renderQuizzes() {
+  document.querySelectorAll(".step").forEach(stepEl => {
+    const step = +stepEl.dataset.step;
+    const data = QUIZZES[step];
+    if (!data) return;
+    const block = document.createElement("div");
+    block.className = "quiz-block";
+    block.innerHTML = `<h3>Verifica le tue conoscenze</h3><ol class="quiz-list"></ol>`;
+    const list = block.querySelector(".quiz-list");
+    data.forEach((q, qi) => {
+      const li = document.createElement("li");
+      li.className = "quiz-q";
+      const badge = q.type === "C" ? '<span class="qn calc">calcolo</span>' : '<span class="qn">teoria</span>';
+      const optsHtml = q.opts.map((o, i) =>
+        `<button data-i="${i}">${String.fromCharCode(65+i)}. ${o}</button>`
+      ).join("");
+      li.innerHTML = `
+        <div class="quiz-prompt">${badge}<strong>${qi+1}.</strong> ${q.q}</div>
+        <div class="quiz-opts">${optsHtml}</div>
+        <div class="quiz-feedback"></div>
+      `;
+      list.appendChild(li);
+      const buttons = li.querySelectorAll(".quiz-opts button");
+      const fb = li.querySelector(".quiz-feedback");
+      buttons.forEach(b => {
+        b.addEventListener("click", () => {
+          const sel = +b.dataset.i;
+          const ok = sel === q.correct;
+          buttons.forEach((bb, i) => {
+            bb.disabled = true;
+            if (i === q.correct) bb.classList.add("ok");
+            else if (i === sel) bb.classList.add("ko");
+          });
+          fb.className = "quiz-feedback " + (ok ? "ok" : "ko");
+          fb.innerHTML = (ok ? "✓ Corretto. " : "✗ Risposta esatta: " + String.fromCharCode(65+q.correct) + ". ") + q.exp;
+          if (window.MathJax && MathJax.typesetPromise) {
+            MathJax.typesetPromise([fb]).catch(()=>{});
+          }
+        });
+      });
+    });
+    const navBar = stepEl.querySelector(".nav-bar");
+    stepEl.insertBefore(block, navBar);
+  });
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise().catch(()=>{});
+  }
+}
+
+if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
+  MathJax.startup.promise.then(renderQuizzes);
+} else {
+  window.addEventListener("load", () => setTimeout(renderQuizzes, 200));
+}
 </script>
 </body>
 </html>
