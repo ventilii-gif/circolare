@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Moto circolare uniforme e moto armonico</title>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<style>
+  :root {
+    --bg: #fafafa;
+    --panel: #ffffff;
+    --ink: #1a1a1a;
+    --muted: #6a6a6a;
+    --line: #e6e6e6;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --ok: #059669;
+    --warn: #d97706;
+    --shm: #db2777;
+    --circ: #2563eb;
+    --vel: #059669;
+    --acc: #d97706;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  header {
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    padding: 18px 24px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 {
+    margin: 0; font-size: 1.15rem; font-weight: 600; letter-spacing: -0.01em;
+  }
+  header .sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+  .container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+  }
+  .stepper {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 18px;
+  }
+  .stepper button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .stepper button:hover { color: var(--ink); border-color: var(--ink); }
+  .stepper button.active {
+    background: var(--ink);
+    color: white;
+    border-color: var(--ink);
+  }
+  .stepper button .num {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    text-align: center;
+    line-height: 18px;
+    font-size: 0.72rem;
+    margin-right: 6px;
+    font-weight: 600;
+  }
+  .stepper button.active .num {
+    background: white; color: var(--ink);
+  }
+  .step { display: none; }
+  .step.active { display: block; }
+  .step h2 {
+    font-size: 1.5rem; font-weight: 600; margin: 0 0 6px;
+    letter-spacing: -0.015em;
+  }
+  .step .lede {
+    color: var(--muted); margin: 0 0 24px; font-size: 1rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .panel h3 {
+    margin: 0 0 10px; font-size: 0.95rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+  }
+  .canvas-wrap { position: relative; }
+  canvas {
+    width: 100%;
+    background: #fcfcfc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: block;
+  }
+  .controls {
+    display: grid; gap: 12px;
+    margin-top: 14px;
+  }
+  .ctrl {
+    display: grid;
+    grid-template-columns: 130px 1fr 70px;
+    gap: 10px;
+    align-items: center;
+    font-size: 0.88rem;
+  }
+  .ctrl label { color: var(--muted); }
+  .ctrl input[type=range] {
+    width: 100%; accent-color: var(--accent);
+  }
+  .ctrl .val {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .row-btns {
+    display: flex; gap: 8px; margin-top: 10px;
+  }
+  .row-btns button {
+    background: white; border: 1px solid var(--line);
+    padding: 6px 12px; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem;
+    font-family: inherit; color: var(--ink);
+  }
+  .row-btns button:hover { border-color: var(--ink); }
+  .row-btns button.primary {
+    background: var(--ink); color: white; border-color: var(--ink);
+  }
+  .prose p { margin: 0 0 12px; }
+  .prose .formula {
+    background: #f4f6fb;
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 14px 0;
+    overflow-x: auto;
+  }
+  .prose .insight {
+    background: #fff7ed;
+    border-left: 3px solid var(--warn);
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 14px 0;
+    font-size: 0.93rem;
+  }
+  .prose .insight strong { color: var(--warn); }
+  .nav-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 36px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+  .nav-bar button {
+    background: var(--ink); color: white;
+    border: none; border-radius: 8px;
+    padding: 10px 18px; cursor: pointer;
+    font-size: 0.9rem; font-family: inherit;
+    font-weight: 500;
+  }
+  .nav-bar button:disabled {
+    background: #d4d4d4; cursor: not-allowed;
+  }
+  .nav-bar button.ghost {
+    background: white; color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    font-size: 0.82rem; color: var(--muted);
+    margin-top: 8px;
+  }
+  .legend span::before {
+    content: ""; display: inline-block;
+    width: 10px; height: 10px; border-radius: 50%;
+    margin-right: 6px; vertical-align: middle;
+  }
+  .legend .l-circ::before { background: var(--circ); }
+  .legend .l-shm::before { background: var(--shm); }
+  .legend .l-vel::before { background: var(--vel); }
+  .legend .l-acc::before { background: var(--acc); }
+  table.compare {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 0.92rem;
+  }
+  table.compare th, table.compare td {
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  table.compare th {
+    background: #f7f7f7;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  table.compare td:first-child {
+    font-weight: 500;
+  }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 500;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Moto circolare uniforme &amp; moto armonico</h1>
+  <div class="sub">La proiezione su un diametro come ponte fra rotazione e oscillazione — molla e pendolo</div>
+</header>
+
+<div class="container">
+
+  <div class="stepper" id="stepper"></div>
+
+  <!-- STEP 1: INTRO -->
+  <section class="step" data-step="1">
+    <h2>1. Il moto circolare uniforme</h2>
+    <p class="lede">Un punto materiale che percorre una circonferenza con velocità (in modulo) costante. Cominciamo dai parametri descrittivi.</p>
+    <div class="grid">
+      <div class="panel">
+        <h3>Visualizzazione</h3>
+        <div class="canvas-wrap"><canvas id="cv-intro" width="600" height="600"></canvas></div>
+        <div class="controls">
+          <div class="ctrl"><label>Raggio $r$ (m)</label><input type="range" id="s-intro-r" min="0.5" max="2" step="0.05" value="1.2"><span class="val" id="v-intro-r">1.20</span></div>
+          <div class="ctrl"><label>Velocità ang. $\omega$ (rad/s)</label><input type="range" id="s-intro-w" min="0.3" max="3" step="0.05" value="1.5"><span class="val" id="v-intro-w">1.50</span></div>
+        </div>
+        <div class="row-btns">
+          <button id="b-intro-play" class="primary">Pausa</button>
+          <button id="b-intro-reset">Reset</button>
+        </div>
+      </div>
+      <div class="panel prose">
+        <h3>Parametri</h3>
+        <p>Il punto $P$ ruota su una circonferenza di raggio $r$. La sua posizione angolare evolve linearmente nel tempo:</p>
+        <div class="formula">$$\theta(t) = \omega t + \varphi_0$$</div>
+        <p>dove $\omega$ è la <em>velocità angolare</em> (rad/s) e $\varphi_0$ la fase iniziale. Tre grandezze descrivono il moto:</p>
+        <div class="formula">$$T = \dfrac{2\pi}{\omega} \quad,\quad f = \dfrac{1}{T} = \dfrac{\omega}{2\pi} \quad,\quad v = \omega r$$</div>
+        <p>$T$ è il <strong>periodo</strong> (tempo di un giro), $f$ la <strong>frequenza</strong> (giri al secondo, Hz), $v$ la velocità tangenziale.</p>
+        <p>L'accelerazione è puramente <em>centripeta</em>, sempre diretta verso il centro:</p>
+        <div class="formula">$$a_c = \dfrac{v^2}{r} = \omega^2 r$$</div>
+        <div class="insight"><strong>Idea chiave.</strong> Il moto è uniforme nel modulo della velocità, ma <em>non</em> nel vettore: la direzione cambia continuamente, e questa è la ragione fisica per cui esiste un'accelerazione.</div>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button class="ghost" disabled>← Indietro</button>
+      <button data-next>Avanti →</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: VECTORS -->
+  <section class="step" data-step="2">
+    <h2>2. Vettori posizione, velocità, accelerazione</h2>
+    <p class="lede">Sulla circonferenza convivono tre vettori che caratterizzano il moto. Capirne la geometria è il primo passo per leggere la proiezione.</p>
+    <div class="grid">
+      <div class="panel">
+        <h3>Vettori in tempo reale</h3>
+        <div class="canvas-wrap"><canvas id="cv-vect" width="600" height="600"></canvas></div>
+        <div class="legend">
+          <span class="l-circ">posizione $\vec r$</span>
+          <span class="l-vel">velocità $\vec v$</span>
+          <span class="l-acc">accelerazione $\vec a$</span>
+        </div>
+        <div class="controls">
+          <div class="ctrl"><label>$\omega$ (rad/s)</label><input type="range" id="s-vect-w" min="0.3" max="3" step="0.05" value="1.2"><span class="val" id="v-vect-w">1.20</span></div>
+        </div>
+        <div class="row-btns">
+          <button id="b-vect-play" class="primary">Pausa</button>
+        </div>
+      </div>
+      <div class="panel prose">
+        <h3>Costruzione</h3>
+        <p>Con asse $x$ orizzontale e $y$ verticale, e con $O$ al centro:</p>
+        <div class="formula">$$\vec r(t) = \big(r\cos(\omega t + \varphi_0),\ r\sin(\omega t + \varphi_0)\big)$$</div>
+        <p>Derivando rispetto a $t$:</p>
+        <div class="formula">$$\vec v(t) = \dfrac{d\vec r}{dt} = \big(-r\omega\sin(\omega t + \varphi_0),\ r\omega\cos(\omega t + \varphi_0)\big)$$</div>
+        <p>Si verifica subito che $\vec v\cdot\vec r = 0$: la velocità è sempre <strong>tangente</strong> alla circonferenza. Derivando ancora:</p>
+        <div class="formula">$$\vec a(t) = -\omega^2\,\vec r(t)$$</div>
+        <div class="insight"><strong>Notare bene.</strong> L'accelerazione è esattamente opposta al raggio: punta sempre verso il centro. Questa proporzionalità con segno meno è — anticipiamo — proprio la firma del moto armonico.</div>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button class="ghost" data-prev>← Indietro</button>
+      <button data-next>Avanti →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: PROJECTION -->
+  <section class="step" data-step="3">
+    <h2>3. La proiezione su un diametro</h2>
+    <p class="lede">Se illuminiamo il punto rotante da molto lontano, la sua ombra su un diametro oscilla avanti e indietro. Quella oscillazione è il <em>moto armonico semplice</em>.</p>
+    <div class="grid">
+      <div class="panel">
+        <h3>Punto + ombra sul diametro orizzontale</h3>
+        <div class="canvas-wrap"><canvas id="cv-proj" width="600" height="600"></canvas></div>
+        <div class="legend">
+          <span class="l-circ">moto circolare</span>
+          <span class="l-shm">proiezione (moto armonico)</span>
+        </div>
+        <div class="controls">
+          <div class="ctrl"><label>Ampiezza $A=r$ (m)</label><input type="range" id="s-proj-r" min="0.5" max="2" step="0.05" value="1.3"><span class="val" id="v-proj-r">1.30</span></div>
+          <div class="ctrl"><label>$\omega$ (rad/s)</label><input type="range" id="s-proj-w" min="0.3" max="3" step="0.05" value="1.1"><span class="val" id="v-proj-w">1.10</span></div>
+          <div class="ctrl"><label>Fase $\varphi_0$ (rad)</label><input type="range" id="s-proj-p" min="0" max="6.283" step="0.05" value="0"><span class="val" id="v-proj-p">0.00</span></div>
+        </div>
+        <div class="row-btns">
+          <button id="b-proj-play" class="primary">Pausa</button>
+        </div>
+      </div>
+      <div class="panel prose">
+        <h3>Grafico $x(t)$</h3>
+        <div class="canvas-wrap"><canvas id="cv-proj-plot" width="600" height="260"></canvas></div>
+        <p>Proiettiamo $\vec r(t)$ sull'asse $x$. La coordinata della "ombra" è:</p>
+        <div class="formula">$$x(t) = r\cos(\omega t + \varphi_0)$$</div>
+        <p>Questa è la definizione cinematica del <strong>moto armonico semplice</strong>: una funzione sinusoidale del tempo con</p>
+        <div class="formula">$$\text{ampiezza } A = r,\quad \text{pulsazione } \omega,\quad \text{fase iniziale } \varphi_0$$</div>
+        <div class="insight"><strong>Osservazione.</strong> Cambiando solo $\varphi_0$ il moto circolare ruota di un'angolo, ma la <em>forma</em> dell'oscillazione sull'asse $x$ resta la stessa: solo trasla nel tempo.</div>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button class="ghost" data-prev>← Indietro</button>
+      <button data-next>Avanti →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: DERIVATION -->
+  <section class="step" data-step="4">
+    <h2>4. Cinematica e dinamica del moto armonico</h2>
+    <p class="lede">Derivando la proiezione otteniamo velocità e accelerazione del moto armonico, e scopriamo la <em>legge dinamica</em> che lo governa.</p>
+    <div class="grid">
+      <div class="panel">
+        <h3>Grafici sincronizzati $x,v,a$</h3>
+        <div class="canvas-wrap"><canvas id="cv-deriv-anim" width="600" height="280"></canvas></div>
+        <div class="canvas-wrap" style="margin-top:10px;"><canvas id="cv-deriv-plot" width="600" height="320"></canvas></div>
+        <div class="legend">
+          <span class="l-shm">$x(t)$ posizione</span>
+          <span class="l-vel">$v(t)$ velocità</span>
+          <span class="l-acc">$a(t)$ accelerazione</span>
+        </div>
+        <div class="controls">
+          <div class="ctrl"><label>Ampiezza $A$ (m)</label><input type="range" id="s-deriv-A" min="0.5" max="2" step="0.05" value="1.2"><span class="val" id="v-deriv-A">1.20</span></div>
+          <div class="ctrl"><label>$\omega$ (rad/s)</label><input type="range" id="s-deriv-w" min="0.5" max="3" step="0.05" value="1.5"><span class="val" id="v-deriv-w">1.50</span></div>
+        </div>
+      </div>
+      <div class="panel prose">
+        <h3>Derivazione</h3>
+        <p>Partiamo da $x(t) = A\cos(\omega t + \varphi_0)$ e deriviamo:</p>
+        <div class="formula">$$v(t) = \dot x = -A\omega\sin(\omega t + \varphi_0)$$</div>
+        <div class="formula">$$a(t) = \ddot x = -A\omega^2\cos(\omega t + \varphi_0)$$</div>
+        <p>Confrontando l'ultima espressione con $x(t)$ otteniamo la relazione che <em>caratterizza</em> il moto armonico:</p>
+        <div class="formula">$$\boxed{\;a(t) = -\omega^2\, x(t)\;}$$</div>
+        <p>L'accelerazione è proporzionale allo spostamento dalla posizione di equilibrio, e di segno opposto. Per la seconda legge di Newton $F = ma$:</p>
+        <div class="formula">$$F(x) = -m\omega^2\, x$$</div>
+        <div class="insight"><strong>Definizione dinamica.</strong> Un sistema esegue moto armonico semplice se e solo se è sottoposto a una <em>forza di richiamo</em> lineare nello spostamento: $F = -kx$, con $k>0$. Confrontando con $F = -m\omega^2 x$ si legge subito $\omega = \sqrt{k/m}$.</div>
+        <p>Da qui il periodo:</p>
+        <div class="formula">$$T = \dfrac{2\pi}{\omega} = 2\pi\sqrt{\dfrac{m}{k}}$$</div>
+        <p>Nei prossimi due passi applichiamo questa lente a due sistemi fisici concreti.</p>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button class="ghost" data-prev>← Indietro</button>
+      <button data-next>Avanti →</button>
+    </div>
+  </section>
+
+  <!-- STEP 5: SPRING -->
+  <section class="step" data-step="5">
+    <h2>5. Caso particolare: la molla <span class="pill">esempio diretto</span></h2>
+    <p class="lede">Una massa attaccata a una molla ideale è il prototipo dell'oscillatore armonico: la legge di Hooke <em>è</em> già la forma $F=-kx$.</p>
+    <div class="grid">
+      <div class="panel">
+        <h3>Animazione</h3>
+        <div class="canvas-wrap"><canvas id="cv-spring" width="600" height="360"></canvas></div>
+        <div class="canvas-wrap" style="margin-top:10px;"><canvas id="cv-spring-plot" width="600" height="180"></canvas></div>
+        <div class="controls">
+          <div class="ctrl"><label>Massa $m$ (kg)</label><input type="range" id="s-spring-m" min="0.2" max="4" step="0.1" value="1"><span class="val" id="v-spring-m">1.0</span></div>
+          <div class="ctrl"><label>Costante $k$ (N/m)</label><input type="range" id="s-spring-k" min="2" max="40" step="0.5" value="10"><span class="val" id="v-spring-k">10.0</span></div>
+          <div class="ctrl"><label>Ampiezza $A$ (m)</label><input type="range" id="s-spring-A" min="0.2" max="1.5" step="0.05" value="0.8"><span class="val" id="v-spring-A">0.80</span></div>
+        </div>
+        <div class="row-btns">
+          <button id="b-spring-play" class="primary">Pausa</button>
+        </div>
+      </div>
+      <div class="panel prose">
+        <h3>Ricavare il periodo</h3>
+        <p>Per una molla ideale di costante elastica $k$, la forza di richiamo è la legge di Hooke:</p>
+        <div class="formula">$$F = -k\,x$$</div>
+        <p>Applicando la seconda legge di Newton al carrello di massa $m$:</p>
+        <div class="formula">$$m\ddot x = -k\,x \quad\Longrightarrow\quad \ddot x = -\dfrac{k}{m}\,x$$</div>
+        <p>Confrontando con la firma del moto armonico $\ddot x = -\omega^2 x$:</p>
+        <div class="formula">$$\omega^2 = \dfrac{k}{m} \quad\Longrightarrow\quad \omega = \sqrt{\dfrac{k}{m}}$$</div>
+        <div class="formula">$$\boxed{\;T_{\text{molla}} = 2\pi\sqrt{\dfrac{m}{k}}\;}$$</div>
+        <div class="insight"><strong>Implicazioni.</strong> Il periodo dipende solo da $m$ e $k$, <em>non</em> dall'ampiezza $A$ (isocronismo). Una molla più rigida (più $k$) o una massa più leggera danno oscillazioni più rapide.</div>
+        <p>Il valore attualmente impostato dà $T = $ <span id="spring-T">…</span> s, $f = $ <span id="spring-f">…</span> Hz.</p>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button class="ghost" data-prev>← Indietro</button>
+      <button data-next>Avanti →</button>
+    </div>
+  </section>
+
+  <!-- STEP 6: PENDULUM -->
+  <section class="step" data-step="6">
+    <h2>6. Caso particolare: il pendolo semplice <span class="pill">piccole oscillazioni</span></h2>
+    <p class="lede">Per un pendolo la forza di richiamo è <em>geometrica</em>, dovuta alla gravità che riallinea il filo verso la verticale. Diventa armonica solo nell'approssimazione di piccoli angoli.</p>
+    <div class="grid">
+      <div class="panel">
+        <h3>Animazione</h3>
+        <div class="canvas-wrap"><canvas id="cv-pend" width="600" height="400"></canvas></div>
+        <div class="canvas-wrap" style="margin-top:10px;"><canvas id="cv-pend-plot" width="600" height="180"></canvas></div>
+        <div class="controls">
+          <div class="ctrl"><label>Lunghezza $L$ (m)</label><input type="range" id="s-pend-L" min="0.3" max="3" step="0.05" value="1"><span class="val" id="v-pend-L">1.00</span></div>
+          <div class="ctrl"><label>$g$ (m/s²)</label><input type="range" id="s-pend-g" min="1" max="20" step="0.1" value="9.81"><span class="val" id="v-pend-g">9.81</span></div>
+          <div class="ctrl"><label>Ampiezza $\theta_0$ (°)</label><input type="range" id="s-pend-th" min="2" max="60" step="1" value="15"><span class="val" id="v-pend-th">15</span></div>
+        </div>
+        <div class="row-btns">
+          <button id="b-pend-play" class="primary">Pausa</button>
+          <button id="b-pend-exact">Confronta con soluzione esatta</button>
+        </div>
+      </div>
+      <div class="panel prose">
+        <h3>Ricavare il periodo</h3>
+        <p>Sia $\theta$ l'angolo del filo rispetto alla verticale. Lungo la direzione tangenziale alla traiettoria, sulla massa $m$ agisce la componente del peso:</p>
+        <div class="formula">$$F_t = -mg\sin\theta$$</div>
+        <p>Lo spostamento sulla traiettoria circolare è $s = L\theta$, dunque $\ddot s = L\ddot\theta$. Newton:</p>
+        <div class="formula">$$mL\ddot\theta = -mg\sin\theta \;\Longrightarrow\; \ddot\theta = -\dfrac{g}{L}\sin\theta$$</div>
+        <p>Per <em>piccoli angoli</em>, $\sin\theta \approx \theta$ (sviluppo di Taylor al primo ordine):</p>
+        <div class="formula">$$\ddot\theta \approx -\dfrac{g}{L}\,\theta$$</div>
+        <p>Stessa firma del moto armonico, con</p>
+        <div class="formula">$$\omega^2 = \dfrac{g}{L} \;\Longrightarrow\; \boxed{\;T_{\text{pendolo}} = 2\pi\sqrt{\dfrac{L}{g}}\;}$$</div>
+        <div class="insight"><strong>Attenzione.</strong> A differenza della molla, il pendolo è armonico solo in <em>approssimazione</em>. Aumentando l'ampiezza il periodo cresce: l'isocronismo di Galileo vale rigorosamente solo per piccole oscillazioni.</div>
+        <p>Valori attuali: $T = $ <span id="pend-T">…</span> s, $f = $ <span id="pend-f">…</span> Hz.</p>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button class="ghost" data-prev>← Indietro</button>
+      <button data-next>Avanti →</button>
+    </div>
+  </section>
+
+  <!-- STEP 7: SUMMARY -->
+  <section class="step" data-step="7">
+    <h2>7. Confronto e riepilogo</h2>
+    <p class="lede">Stessa equazione, due realizzazioni fisiche diverse. La pulsazione $\omega$ traduce le proprietà del sistema concreto nei parametri dell'oscillazione astratta.</p>
+    <div class="grid">
+      <div class="panel">
+        <h3>Lo stesso moto armonico, tre incarnazioni</h3>
+        <div class="canvas-wrap"><canvas id="cv-sum" width="600" height="420"></canvas></div>
+        <div class="legend">
+          <span class="l-circ">proiezione del moto circolare</span>
+          <span class="l-shm">molla</span>
+          <span class="l-acc">pendolo (piccoli angoli)</span>
+        </div>
+        <div class="controls">
+          <div class="ctrl"><label>$\omega$ comune (rad/s)</label><input type="range" id="s-sum-w" min="0.5" max="3" step="0.05" value="1.5"><span class="val" id="v-sum-w">1.50</span></div>
+        </div>
+      </div>
+      <div class="panel prose">
+        <h3>Tabella sinottica</h3>
+        <table class="compare">
+          <thead>
+            <tr><th>Sistema</th><th>Forza di richiamo</th><th>$\omega^2$</th><th>Periodo $T$</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Proiezione del MCU</td>
+              <td>(definizione cinematica)</td>
+              <td>$\omega^2$</td>
+              <td>$2\pi/\omega$</td>
+            </tr>
+            <tr>
+              <td>Molla — massa $m$</td>
+              <td>$F=-kx$</td>
+              <td>$k/m$</td>
+              <td>$2\pi\sqrt{m/k}$</td>
+            </tr>
+            <tr>
+              <td>Pendolo (piccoli angoli)</td>
+              <td>$F_t \approx -mg\,\theta$</td>
+              <td>$g/L$</td>
+              <td>$2\pi\sqrt{L/g}$</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="insight" style="margin-top:18px;">
+          <strong>Lettura unitaria.</strong> Ogni moto armonico semplice è "geometricamente equivalente" alla proiezione di un moto circolare uniforme su un diametro. La differenza fra molla e pendolo sta solo nel <em>contenuto fisico</em> di $\omega$: dipende dalla rigidezza in un caso, dalla geometria del campo gravitazionale nell'altro.
+        </div>
+        <p style="margin-top:14px;"><strong>Domanda di verifica.</strong> Se raddoppi la massa di una molla, di quanto cambia il periodo? E quello di un pendolo? <em>(Risposta: la molla rallenta di $\sqrt 2$, il pendolo non cambia — la massa non compare in $T_{\text{pend}}$.)</em></p>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button class="ghost" data-prev>← Indietro</button>
+      <button class="ghost" id="b-restart">↻ Ricomincia</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ============================================================
+//  STEPPER NAVIGATION
+// ============================================================
+const STEP_TITLES = [
+  "MCU",
+  "Vettori",
+  "Proiezione",
+  "Dinamica MAS",
+  "Molla",
+  "Pendolo",
+  "Sintesi"
+];
+const stepperEl = document.getElementById("stepper");
+STEP_TITLES.forEach((t, i) => {
+  const b = document.createElement("button");
+  b.innerHTML = `<span class="num">${i+1}</span>${t}`;
+  b.dataset.go = i+1;
+  b.addEventListener("click", () => goStep(i+1));
+  stepperEl.appendChild(b);
+});
+function goStep(n) {
+  document.querySelectorAll(".step").forEach(s => s.classList.toggle("active", +s.dataset.step === n));
+  document.querySelectorAll(".stepper button").forEach(b => b.classList.toggle("active", +b.dataset.go === n));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.querySelectorAll("[data-next]").forEach(b => b.addEventListener("click", () => {
+  const cur = +b.closest(".step").dataset.step;
+  if (cur < STEP_TITLES.length) goStep(cur + 1);
+}));
+document.querySelectorAll("[data-prev]").forEach(b => b.addEventListener("click", () => {
+  const cur = +b.closest(".step").dataset.step;
+  if (cur > 1) goStep(cur - 1);
+}));
+document.getElementById("b-restart").addEventListener("click", () => goStep(1));
+goStep(1);
+
+// ============================================================
+//  CANVAS HELPERS (HiDPI)
+// ============================================================
+function fitCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = cv.getBoundingClientRect();
+  cv.width = Math.round(rect.width * dpr);
+  cv.height = Math.round(rect.height * dpr);
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
+}
+function arrow(ctx, x1, y1, x2, y2, color, width=2) {
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  const head = 9;
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - head*Math.cos(ang - 0.4), y2 - head*Math.sin(ang - 0.4));
+  ctx.lineTo(x2 - head*Math.cos(ang + 0.4), y2 - head*Math.sin(ang + 0.4));
+  ctx.closePath(); ctx.fill();
+}
+function label(ctx, txt, x, y, color="#1a1a1a", size=13) {
+  ctx.fillStyle = color;
+  ctx.font = `500 ${size}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(txt, x, y);
+}
+
+// ============================================================
+//  GLOBAL CLOCK
+// ============================================================
+let t0 = performance.now();
+const playing = { intro: true, vect: true, proj: true, deriv: true, spring: true, pend: true, sum: true };
+function now() { return (performance.now() - t0) / 1000; }
+
+// ============================================================
+//  STEP 1: INTRO
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-intro");
+  let ctx;
+  const sR = document.getElementById("s-intro-r"), vR = document.getElementById("v-intro-r");
+  const sW = document.getElementById("s-intro-w"), vW = document.getElementById("v-intro-w");
+  const btn = document.getElementById("b-intro-play");
+  const btnR = document.getElementById("b-intro-reset");
+  let phase = 0, lastT = now();
+
+  sR.addEventListener("input", () => vR.textContent = (+sR.value).toFixed(2));
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+  btn.addEventListener("click", () => { playing.intro = !playing.intro; btn.textContent = playing.intro ? "Pausa" : "Play"; });
+  btnR.addEventListener("click", () => { phase = 0; });
+
+  function draw() {
+    if (!ctx) ctx = fitCanvas(cv);
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+    const cx = W/2, cy = H/2;
+    const scale = Math.min(W, H) * 0.35;
+    const r = +sR.value, w = +sW.value;
+    const t = now();
+    if (playing.intro) phase += (t - lastT) * w;
+    lastT = t;
+
+    // circle
+    ctx.strokeStyle = "#cfd4dc"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r*scale, 0, Math.PI*2); ctx.stroke();
+    // axes
+    ctx.strokeStyle = "#e6e6e6"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - r*scale - 30, cy); ctx.lineTo(cx + r*scale + 30, cy);
+    ctx.moveTo(cx, cy - r*scale - 30); ctx.lineTo(cx, cy + r*scale + 30);
+    ctx.stroke();
+
+    // point
+    const px = cx + r*scale*Math.cos(phase);
+    const py = cy - r*scale*Math.sin(phase);
+    // radius
+    arrow(ctx, cx, cy, px, py, "#2563eb", 2.2);
+    // angle arc
+    ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, 26, 0, -phase, true); ctx.stroke();
+    label(ctx, "θ", cx + 32, cy - 6, "#64748b", 13);
+
+    // dot
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI*2); ctx.fill();
+
+    label(ctx, "O", cx - 14, cy + 16, "#64748b");
+    label(ctx, "P", px + 10, py - 8, "#1a1a1a");
+    label(ctx, `r = ${r.toFixed(2)} m`, 14, 22, "#2563eb");
+    label(ctx, `ω = ${w.toFixed(2)} rad/s   T = ${(2*Math.PI/w).toFixed(2)} s   v = ${(w*r).toFixed(2)} m/s`, 14, 42, "#64748b");
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 2: VECTORS
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-vect");
+  let ctx;
+  const sW = document.getElementById("s-vect-w"), vW = document.getElementById("v-vect-w");
+  const btn = document.getElementById("b-vect-play");
+  let phase = 0, lastT = now();
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+  btn.addEventListener("click", () => { playing.vect = !playing.vect; btn.textContent = playing.vect ? "Pausa" : "Play"; });
+
+  function draw() {
+    if (!ctx) ctx = fitCanvas(cv);
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+    const cx = W/2, cy = H/2;
+    const scale = Math.min(W, H) * 0.32;
+    const r = 1.3, w = +sW.value;
+    const t = now();
+    if (playing.vect) phase += (t - lastT) * w;
+    lastT = t;
+    ctx.strokeStyle = "#cfd4dc"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r*scale, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = "#eee";
+    ctx.beginPath();
+    ctx.moveTo(cx - r*scale - 30, cy); ctx.lineTo(cx + r*scale + 30, cy);
+    ctx.moveTo(cx, cy - r*scale - 30); ctx.lineTo(cx, cy + r*scale + 30);
+    ctx.stroke();
+
+    const px = cx + r*scale*Math.cos(phase);
+    const py = cy - r*scale*Math.sin(phase);
+
+    // position vector
+    arrow(ctx, cx, cy, px, py, "#2563eb", 2);
+    label(ctx, "r", (cx+px)/2 + 8, (cy+py)/2 - 6, "#2563eb", 14);
+
+    // velocity vector (tangent): perpendicular to r, rotated 90 ccw, length proportional to ω r
+    const vLen = (w*r) * scale * 0.4;
+    const vx = px - vLen*Math.sin(phase);
+    const vy = py - vLen*Math.cos(phase);
+    arrow(ctx, px, py, vx, vy, "#059669", 2);
+    label(ctx, "v", vx + 6, vy - 6, "#059669", 14);
+
+    // acceleration vector: centripetal, from P towards O, length ω²r
+    const aLen = (w*w*r) * scale * 0.18;
+    const ax = px + aLen*(cx - px)/(r*scale);
+    const ay = py + aLen*(cy - py)/(r*scale);
+    arrow(ctx, px, py, ax, ay, "#d97706", 2);
+    label(ctx, "a", ax + 6, ay + 14, "#d97706", 14);
+
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#94a3b8";
+    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill();
+
+    label(ctx, `|v| = ω·r = ${(w*r).toFixed(2)} m/s`, 14, 22, "#059669");
+    label(ctx, `|a| = ω²·r = ${(w*w*r).toFixed(2)} m/s²`, 14, 42, "#d97706");
+    label(ctx, "v ⊥ r,  a = −ω² r  →  a punta verso O", 14, H - 14, "#64748b", 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 3: PROJECTION + plot
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-proj");
+  const cp = document.getElementById("cv-proj-plot");
+  let ctx, ctxP;
+  const sR = document.getElementById("s-proj-r"), vR = document.getElementById("v-proj-r");
+  const sW = document.getElementById("s-proj-w"), vW = document.getElementById("v-proj-w");
+  const sP = document.getElementById("s-proj-p"), vP = document.getElementById("v-proj-p");
+  const btn = document.getElementById("b-proj-play");
+  sR.addEventListener("input", () => vR.textContent = (+sR.value).toFixed(2));
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+  sP.addEventListener("input", () => vP.textContent = (+sP.value).toFixed(2));
+  btn.addEventListener("click", () => { playing.proj = !playing.proj; btn.textContent = playing.proj ? "Pausa" : "Play"; });
+
+  let phase = 0, lastT = now();
+
+  function draw() {
+    if (!ctx) ctx = fitCanvas(cv);
+    if (!ctxP) ctxP = fitCanvas(cp);
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const r = +sR.value, w = +sW.value, p0 = +sP.value;
+    const t = now();
+    if (playing.proj) phase += (t - lastT) * w;
+    lastT = t;
+    const ang = phase + p0;
+
+    const cx = W*0.40, cy = H*0.5;
+    const scale = Math.min(W, H) * 0.32;
+
+    // axes
+    ctx.strokeStyle = "#eaeaea";
+    ctx.beginPath();
+    ctx.moveTo(cx - r*scale - 20, cy); ctx.lineTo(W - 20, cy);
+    ctx.moveTo(cx, cy - r*scale - 20); ctx.lineTo(cx, cy + r*scale + 20);
+    ctx.stroke();
+
+    // circle
+    ctx.strokeStyle = "#cfd4dc"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r*scale, 0, Math.PI*2); ctx.stroke();
+
+    // diameter (projection axis) highlighted
+    ctx.strokeStyle = "#fbb6ce"; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(cx - r*scale, cy); ctx.lineTo(cx + r*scale, cy); ctx.stroke();
+    ctx.lineCap = "butt";
+
+    const px = cx + r*scale*Math.cos(ang);
+    const py = cy - r*scale*Math.sin(ang);
+
+    // radius
+    ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py); ctx.stroke();
+
+    // projection line
+    ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, cy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // point on circle
+    ctx.fillStyle = "#2563eb";
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI*2); ctx.fill();
+    // shadow on diameter
+    ctx.fillStyle = "#db2777";
+    ctx.beginPath(); ctx.arc(px, cy, 8, 0, Math.PI*2); ctx.fill();
+
+    label(ctx, "P", px + 10, py - 8, "#2563eb");
+    label(ctx, "x(t)", px - 16, cy + 22, "#db2777");
+    label(ctx, `x = ${(r*Math.cos(ang)).toFixed(3)} m`, 14, 22, "#db2777");
+
+    // ----- plot x(t) -----
+    const pRect = cp.getBoundingClientRect();
+    const PW = pRect.width, PH = pRect.height;
+    ctxP.clearRect(0, 0, PW, PH);
+    const pad = 30;
+    // axes
+    ctxP.strokeStyle = "#e6e6e6";
+    ctxP.beginPath();
+    ctxP.moveTo(pad, pad); ctxP.lineTo(pad, PH - pad);
+    ctxP.lineTo(PW - 10, PH - pad);
+    ctxP.stroke();
+    // labels
+    label(ctxP, "x", pad - 22, pad + 4, "#64748b");
+    label(ctxP, "t", PW - 18, PH - pad + 14, "#64748b");
+
+    // mid line
+    const midY = (pad + (PH - pad)) / 2;
+    ctxP.strokeStyle = "#eee";
+    ctxP.beginPath(); ctxP.moveTo(pad, midY); ctxP.lineTo(PW - 10, midY); ctxP.stroke();
+
+    // window of 3 periods
+    const Tper = 2*Math.PI / w;
+    const tWindow = 3 * Tper;
+    const xToPx = (tt) => pad + (tt / tWindow) * (PW - pad - 10);
+    const yToPx = (xx) => midY - (xx / r) * ((PH - 2*pad) / 2 * 0.9);
+
+    // curve covering full window aligned so that current time corresponds to phase
+    ctxP.strokeStyle = "#db2777"; ctxP.lineWidth = 2;
+    ctxP.beginPath();
+    const tNow = (phase + p0) / w; // virtual "time" mapping
+    for (let i = 0; i <= 400; i++) {
+      const tt = (i / 400) * tWindow;
+      const xx = r * Math.cos(w * tt + p0);
+      const X = xToPx(tt), Y = yToPx(xx);
+      if (i === 0) ctxP.moveTo(X, Y); else ctxP.lineTo(X, Y);
+    }
+    ctxP.stroke();
+
+    // current marker: time corresponds to ang mapped into [0, tWindow]
+    const tMark = ((tNow % tWindow) + tWindow) % tWindow;
+    const xx = r * Math.cos(ang);
+    const MX = xToPx(tMark), MY = yToPx(xx);
+    ctxP.fillStyle = "#db2777";
+    ctxP.beginPath(); ctxP.arc(MX, MY, 5, 0, Math.PI*2); ctxP.fill();
+
+    label(ctxP, `x(t) = r·cos(ωt + φ₀)`, PW - 200, pad + 4, "#db2777", 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 4: DERIVATION (small anim + 3 stacked plots)
+// ============================================================
+(() => {
+  const cvA = document.getElementById("cv-deriv-anim");
+  const cvP = document.getElementById("cv-deriv-plot");
+  let ctxA, ctxP;
+  const sA = document.getElementById("s-deriv-A"), vA = document.getElementById("v-deriv-A");
+  const sW = document.getElementById("s-deriv-w"), vW = document.getElementById("v-deriv-w");
+  sA.addEventListener("input", () => vA.textContent = (+sA.value).toFixed(2));
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+
+  let phase = 0, lastT = now();
+
+  function draw() {
+    if (!ctxA) ctxA = fitCanvas(cvA);
+    if (!ctxP) ctxP = fitCanvas(cvP);
+    const A = +sA.value, w = +sW.value;
+    const t = now();
+    if (playing.deriv) phase += (t - lastT) * w;
+    lastT = t;
+
+    // ----- top: circle + projection on horizontal line below -----
+    const aRect = cvA.getBoundingClientRect();
+    const W = aRect.width, H = aRect.height;
+    ctxA.clearRect(0, 0, W, H);
+    const cx = 130, cy = H/2;
+    const scale = Math.min(H * 0.4, 100);
+    ctxA.strokeStyle = "#cfd4dc";
+    ctxA.beginPath(); ctxA.arc(cx, cy, A*scale, 0, Math.PI*2); ctxA.stroke();
+    // diameter
+    ctxA.strokeStyle = "#fbb6ce"; ctxA.lineWidth = 3;
+    ctxA.beginPath(); ctxA.moveTo(cx - A*scale, cy); ctxA.lineTo(cx + A*scale, cy); ctxA.stroke();
+    ctxA.lineWidth = 1;
+    const ang = phase;
+    const px = cx + A*scale*Math.cos(ang);
+    const py = cy - A*scale*Math.sin(ang);
+    ctxA.strokeStyle = "#9ca3af"; ctxA.setLineDash([4,4]);
+    ctxA.beginPath(); ctxA.moveTo(px, py); ctxA.lineTo(px, cy); ctxA.stroke();
+    ctxA.setLineDash([]);
+    ctxA.fillStyle = "#2563eb"; ctxA.beginPath(); ctxA.arc(px, py, 6, 0, Math.PI*2); ctxA.fill();
+    ctxA.fillStyle = "#db2777"; ctxA.beginPath(); ctxA.arc(px, cy, 8, 0, Math.PI*2); ctxA.fill();
+
+    // horizontal track to the right
+    const trackY = cy;
+    const trackX0 = cx + A*scale + 40;
+    const trackLen = W - trackX0 - 30;
+    ctxA.strokeStyle = "#e6e6e6";
+    ctxA.beginPath(); ctxA.moveTo(trackX0, trackY); ctxA.lineTo(trackX0 + trackLen, trackY); ctxA.stroke();
+    // equilibrium mark and amplitude marks
+    const cTrack = trackX0 + trackLen/2;
+    ctxA.strokeStyle = "#bbb";
+    ctxA.beginPath(); ctxA.moveTo(cTrack, trackY - 14); ctxA.lineTo(cTrack, trackY + 14); ctxA.stroke();
+    const xPos = A * Math.cos(ang);
+    const mPx = cTrack + (xPos / A) * (trackLen/2 * 0.85);
+    ctxA.fillStyle = "#db2777";
+    ctxA.beginPath(); ctxA.arc(mPx, trackY, 10, 0, Math.PI*2); ctxA.fill();
+    label(ctxA, "equilibrio", cTrack - 28, trackY + 30, "#94a3b8", 11);
+    label(ctxA, "x(t) ricavato come proiezione", trackX0, 20, "#db2777", 12);
+
+    // ----- bottom: three stacked plots -----
+    const pRect = cvP.getBoundingClientRect();
+    const PW = pRect.width, PH = pRect.height;
+    ctxP.clearRect(0, 0, PW, PH);
+    const pad = 28;
+    const plotH = (PH - 4*pad) / 3;
+    const Tper = 2*Math.PI / w;
+    const tWindow = 2.5 * Tper;
+    const yScale = { x: A, v: A*w, a: A*w*w };
+    const colors = { x: "#db2777", v: "#059669", a: "#d97706" };
+    const labels = {
+      x: "x(t) = A cos(ωt)",
+      v: "v(t) = −Aω sin(ωt)",
+      a: "a(t) = −Aω² cos(ωt) = −ω² x(t)"
+    };
+    const fns = {
+      x: (tt) => A*Math.cos(w*tt),
+      v: (tt) => -A*w*Math.sin(w*tt),
+      a: (tt) => -A*w*w*Math.cos(w*tt)
+    };
+
+    const keys = ["x", "v", "a"];
+    const tNow = phase / w;
+    const tMark = ((tNow % tWindow) + tWindow) % tWindow;
+
+    keys.forEach((k, idx) => {
+      const top = pad + idx * (plotH + pad);
+      const bot = top + plotH;
+      const mid = (top + bot)/2;
+      // frame
+      ctxP.strokeStyle = "#e6e6e6";
+      ctxP.beginPath();
+      ctxP.moveTo(pad, top); ctxP.lineTo(pad, bot);
+      ctxP.lineTo(PW - 10, bot);
+      ctxP.stroke();
+      // zero line
+      ctxP.strokeStyle = "#eee";
+      ctxP.beginPath(); ctxP.moveTo(pad, mid); ctxP.lineTo(PW - 10, mid); ctxP.stroke();
+      // curve
+      ctxP.strokeStyle = colors[k]; ctxP.lineWidth = 2;
+      ctxP.beginPath();
+      const ymax = yScale[k];
+      for (let i = 0; i <= 400; i++) {
+        const tt = (i/400) * tWindow;
+        const val = fns[k](tt);
+        const X = pad + (tt/tWindow) * (PW - pad - 10);
+        const Y = mid - (val/ymax) * (plotH/2 * 0.85);
+        if (i === 0) ctxP.moveTo(X, Y); else ctxP.lineTo(X, Y);
+      }
+      ctxP.stroke();
+      // current marker
+      const valNow = fns[k](tMark);
+      const MX = pad + (tMark/tWindow) * (PW - pad - 10);
+      const MY = mid - (valNow/ymax) * (plotH/2 * 0.85);
+      ctxP.fillStyle = colors[k];
+      ctxP.beginPath(); ctxP.arc(MX, MY, 5, 0, Math.PI*2); ctxP.fill();
+      label(ctxP, labels[k], pad + 6, top + 13, colors[k], 12);
+    });
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 5: SPRING
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-spring");
+  const cp = document.getElementById("cv-spring-plot");
+  let ctx, ctxP;
+  const sM = document.getElementById("s-spring-m"), vM = document.getElementById("v-spring-m");
+  const sK = document.getElementById("s-spring-k"), vK = document.getElementById("v-spring-k");
+  const sA = document.getElementById("s-spring-A"), vAA = document.getElementById("v-spring-A");
+  const btn = document.getElementById("b-spring-play");
+  const tEl = document.getElementById("spring-T"), fEl = document.getElementById("spring-f");
+  sM.addEventListener("input", () => vM.textContent = (+sM.value).toFixed(1));
+  sK.addEventListener("input", () => vK.textContent = (+sK.value).toFixed(1));
+  sA.addEventListener("input", () => vAA.textContent = (+sA.value).toFixed(2));
+  btn.addEventListener("click", () => { playing.spring = !playing.spring; btn.textContent = playing.spring ? "Pausa" : "Play"; });
+
+  let phase = 0, lastT = now();
+
+  function springPath(ctx, x0, y, x1, coils=14, amp=10) {
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    const L = x1 - x0;
+    const N = 80;
+    for (let i = 1; i <= N; i++) {
+      const t = i/N;
+      const xx = x0 + L*t;
+      let yy = y;
+      if (t > 0.06 && t < 0.94) {
+        yy = y + Math.sin(t * coils * Math.PI * 2) * amp;
+      }
+      ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+
+  function draw() {
+    if (!ctx) ctx = fitCanvas(cv);
+    if (!ctxP) ctxP = fitCanvas(cp);
+    const m = +sM.value, k = +sK.value, A = +sA.value;
+    const w = Math.sqrt(k/m);
+    const Tper = 2*Math.PI/w;
+    tEl.textContent = Tper.toFixed(2);
+    fEl.textContent = (1/Tper).toFixed(2);
+    const t = now();
+    if (playing.spring) phase += (t - lastT) * w;
+    lastT = t;
+    const x = A * Math.cos(phase);
+    const v = -A*w*Math.sin(phase);
+    const a = -A*w*w*Math.cos(phase);
+
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // wall
+    const wallX = 60;
+    const trackY = H * 0.55;
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(wallX - 20, trackY - 90, 8, 180);
+    // hatch
+    ctx.strokeStyle = "#1a1a1a";
+    for (let i = -90; i < 90; i += 12) {
+      ctx.beginPath(); ctx.moveTo(wallX - 20, trackY + i); ctx.lineTo(wallX - 32, trackY + i + 8); ctx.stroke();
+    }
+    // floor
+    ctx.strokeStyle = "#cfd4dc";
+    ctx.beginPath(); ctx.moveTo(wallX, trackY + 50); ctx.lineTo(W - 30, trackY + 50); ctx.stroke();
+    // equilibrium line
+    const eqX = wallX + 250;
+    ctx.strokeStyle = "#cbd5e1"; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(eqX, trackY - 60); ctx.lineTo(eqX, trackY + 50); ctx.stroke();
+    ctx.setLineDash([]);
+    label(ctx, "x = 0", eqX - 18, trackY + 68, "#94a3b8", 11);
+
+    // mass position
+    const scale = 100;
+    const massX = eqX + x*scale;
+    // spring
+    ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 2;
+    springPath(ctx, wallX - 12, trackY, massX - 28, 16, 10);
+    // mass block
+    ctx.fillStyle = "#db2777";
+    ctx.fillRect(massX - 28, trackY - 28, 56, 56);
+    ctx.strokeStyle = "#9d174d"; ctx.lineWidth = 2;
+    ctx.strokeRect(massX - 28, trackY - 28, 56, 56);
+    label(ctx, "m", massX - 6, trackY + 4, "white", 14);
+
+    // arrow showing force direction
+    if (Math.abs(x) > 0.01) {
+      const Fdir = -Math.sign(x);
+      arrow(ctx, massX, trackY - 50, massX + Fdir*60, trackY - 50, "#0ea5e9", 2);
+      label(ctx, "F = −kx", massX + Fdir*30 - 22, trackY - 58, "#0ea5e9", 12);
+    }
+
+    label(ctx, `x = ${x.toFixed(2)} m   v = ${v.toFixed(2)} m/s   a = ${a.toFixed(2)} m/s²`, 16, 22, "#64748b", 12);
+    label(ctx, `ω = √(k/m) = ${w.toFixed(2)} rad/s   T = 2π√(m/k) = ${Tper.toFixed(2)} s`, 16, 42, "#2563eb", 12);
+
+    // plot x(t)
+    const pRect = cp.getBoundingClientRect();
+    const PW = pRect.width, PH = pRect.height;
+    ctxP.clearRect(0, 0, PW, PH);
+    const pad = 22;
+    const mid = PH/2;
+    ctxP.strokeStyle = "#e6e6e6";
+    ctxP.beginPath();
+    ctxP.moveTo(pad, pad); ctxP.lineTo(pad, PH - pad);
+    ctxP.lineTo(PW - 8, PH - pad);
+    ctxP.stroke();
+    ctxP.strokeStyle = "#eee";
+    ctxP.beginPath(); ctxP.moveTo(pad, mid); ctxP.lineTo(PW - 8, mid); ctxP.stroke();
+    const tWin = 3*Tper;
+    ctxP.strokeStyle = "#db2777"; ctxP.lineWidth = 2;
+    ctxP.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const tt = i/400 * tWin;
+      const xx = A*Math.cos(w*tt);
+      const X = pad + (tt/tWin) * (PW - pad - 8);
+      const Y = mid - (xx/A) * (PH/2 - pad) * 0.85;
+      if (i === 0) ctxP.moveTo(X, Y); else ctxP.lineTo(X, Y);
+    }
+    ctxP.stroke();
+    const tNow = phase / w;
+    const tMark = ((tNow % tWin) + tWin) % tWin;
+    const MX = pad + (tMark/tWin) * (PW - pad - 8);
+    const MY = mid - (x/A) * (PH/2 - pad) * 0.85;
+    ctxP.fillStyle = "#db2777";
+    ctxP.beginPath(); ctxP.arc(MX, MY, 5, 0, Math.PI*2); ctxP.fill();
+    label(ctxP, "x(t)", PW - 50, pad + 10, "#db2777", 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 6: PENDULUM (linearized + optional exact integration)
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-pend");
+  const cp = document.getElementById("cv-pend-plot");
+  let ctx, ctxP;
+  const sL = document.getElementById("s-pend-L"), vL = document.getElementById("v-pend-L");
+  const sG = document.getElementById("s-pend-g"), vG = document.getElementById("v-pend-g");
+  const sTh = document.getElementById("s-pend-th"), vTh = document.getElementById("v-pend-th");
+  const btn = document.getElementById("b-pend-play");
+  const btnEx = document.getElementById("b-pend-exact");
+  const tEl = document.getElementById("pend-T"), fEl = document.getElementById("pend-f");
+  let showExact = false;
+
+  sL.addEventListener("input", () => vL.textContent = (+sL.value).toFixed(2));
+  sG.addEventListener("input", () => vG.textContent = (+sG.value).toFixed(2));
+  sTh.addEventListener("input", () => { vTh.textContent = (+sTh.value).toFixed(0); resetExact(); });
+  btn.addEventListener("click", () => { playing.pend = !playing.pend; btn.textContent = playing.pend ? "Pausa" : "Play"; });
+  btnEx.addEventListener("click", () => {
+    showExact = !showExact;
+    btnEx.textContent = showExact ? "Nascondi soluzione esatta" : "Confronta con soluzione esatta";
+    resetExact();
+  });
+
+  let phase = 0, lastT = now();
+  let exactTheta = 0, exactOmega = 0, exactInit = false;
+  function resetExact() {
+    exactTheta = (+sTh.value) * Math.PI/180;
+    exactOmega = 0;
+    exactInit = true;
+  }
+  resetExact();
+
+  function draw() {
+    if (!ctx) ctx = fitCanvas(cv);
+    if (!ctxP) ctxP = fitCanvas(cp);
+    const L = +sL.value, g = +sG.value, th0 = (+sTh.value) * Math.PI/180;
+    const w = Math.sqrt(g/L);
+    const Tper = 2*Math.PI/w;
+    tEl.textContent = Tper.toFixed(2);
+    fEl.textContent = (1/Tper).toFixed(2);
+
+    const t = now();
+    const dt = t - lastT;
+    if (playing.pend) {
+      phase += dt * w;
+      // integrate exact ODE: ddθ = -g/L sin θ (semi-implicit Euler, small steps)
+      if (showExact) {
+        const steps = 8;
+        const h = dt/steps;
+        for (let i = 0; i < steps; i++) {
+          exactOmega += -g/L * Math.sin(exactTheta) * h;
+          exactTheta += exactOmega * h;
+        }
+      }
+    }
+    lastT = t;
+
+    const theta = th0 * Math.cos(phase);
+
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+    const pivX = W/2, pivY = 40;
+    const scale = Math.min(H - 100, 280);
+    // ceiling
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(pivX - 50, pivY - 12, 100, 6);
+    for (let i = -45; i <= 45; i += 9) {
+      ctx.beginPath(); ctx.moveTo(pivX + i, pivY - 6); ctx.lineTo(pivX + i + 6, pivY - 12); ctx.stroke();
+    }
+    // dotted vertical
+    ctx.strokeStyle = "#cfd4dc"; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(pivX, pivY + scale + 30); ctx.stroke();
+    ctx.setLineDash([]);
+
+    function drawPend(th, color, alpha=1, dashed=false) {
+      const bx = pivX + scale*Math.sin(th);
+      const by = pivY + scale*Math.cos(th);
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color; ctx.lineWidth = 2;
+      if (dashed) ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(bx, by, 16, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // arc of motion
+    ctx.strokeStyle = "#e6e6e6";
+    ctx.beginPath();
+    ctx.arc(pivX, pivY, scale, Math.PI/2 - th0, Math.PI/2 + th0);
+    ctx.stroke();
+
+    // linearized pendulum (main)
+    drawPend(theta, "#db2777", 1);
+    // exact overlay
+    if (showExact) {
+      drawPend(exactTheta, "#0ea5e9", 0.85, true);
+    }
+
+    label(ctx, `L = ${L.toFixed(2)} m   g = ${g.toFixed(2)} m/s²   θ₀ = ${(+sTh.value).toFixed(0)}°`, 14, 22, "#64748b", 12);
+    label(ctx, `ω = √(g/L) = ${w.toFixed(2)} rad/s   T = 2π√(L/g) = ${Tper.toFixed(2)} s`, 14, 42, "#2563eb", 12);
+    if (showExact) {
+      label(ctx, "rosa: approssimazione armonica   azzurro: ODE non lineare", 14, H - 14, "#64748b", 11);
+    }
+
+    // plot θ(t)
+    const pRect = cp.getBoundingClientRect();
+    const PW = pRect.width, PH = pRect.height;
+    ctxP.clearRect(0, 0, PW, PH);
+    const pad = 22;
+    const mid = PH/2;
+    ctxP.strokeStyle = "#e6e6e6";
+    ctxP.beginPath();
+    ctxP.moveTo(pad, pad); ctxP.lineTo(pad, PH - pad);
+    ctxP.lineTo(PW - 8, PH - pad);
+    ctxP.stroke();
+    ctxP.strokeStyle = "#eee";
+    ctxP.beginPath(); ctxP.moveTo(pad, mid); ctxP.lineTo(PW - 8, mid); ctxP.stroke();
+    const tWin = 3 * Tper;
+    ctxP.strokeStyle = "#db2777"; ctxP.lineWidth = 2;
+    ctxP.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const tt = i/400 * tWin;
+      const thh = th0 * Math.cos(w*tt);
+      const X = pad + (tt/tWin) * (PW - pad - 8);
+      const Y = mid - (thh/th0) * (PH/2 - pad) * 0.85;
+      if (i === 0) ctxP.moveTo(X, Y); else ctxP.lineTo(X, Y);
+    }
+    ctxP.stroke();
+    const tNow = phase / w;
+    const tMark = ((tNow % tWin) + tWin) % tWin;
+    const MX = pad + (tMark/tWin) * (PW - pad - 8);
+    const MY = mid - (theta/th0) * (PH/2 - pad) * 0.85;
+    ctxP.fillStyle = "#db2777";
+    ctxP.beginPath(); ctxP.arc(MX, MY, 5, 0, Math.PI*2); ctxP.fill();
+    label(ctxP, "θ(t)  (approssimazione armonica)", PW - 240, pad + 10, "#db2777", 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 7: SUMMARY — three coupled illustrations
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-sum");
+  let ctx;
+  const sW = document.getElementById("s-sum-w"), vW = document.getElementById("v-sum-w");
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+  let phase = 0, lastT = now();
+
+  function springPath(ctx, x0, y, x1, coils=12, amp=8) {
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    const L = x1 - x0;
+    const N = 70;
+    for (let i = 1; i <= N; i++) {
+      const tt = i/N;
+      const xx = x0 + L*tt;
+      let yy = y;
+      if (tt > 0.06 && tt < 0.94) yy = y + Math.sin(tt * coils * Math.PI * 2) * amp;
+      ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+
+  function draw() {
+    if (!ctx) ctx = fitCanvas(cv);
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+    const w = +sW.value;
+    const t = now();
+    if (playing.sum) phase += (t - lastT) * w;
+    lastT = t;
+    const A = 1;
+    const x = A * Math.cos(phase);
+
+    const rowH = H / 3;
+    // Row 1: circle + projection
+    {
+      const cy = rowH/2 + 6;
+      const cx = 90;
+      const sc = 48;
+      ctx.strokeStyle = "#cfd4dc";
+      ctx.beginPath(); ctx.arc(cx, cy, A*sc, 0, Math.PI*2); ctx.stroke();
+      ctx.strokeStyle = "#fbb6ce"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(cx - A*sc, cy); ctx.lineTo(cx + A*sc, cy); ctx.stroke();
+      ctx.lineWidth = 1;
+      const px = cx + A*sc*Math.cos(phase);
+      const py = cy - A*sc*Math.sin(phase);
+      ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, cy); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#2563eb"; ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI*2); ctx.fill();
+      // long track
+      const tx0 = cx + A*sc + 30, txL = W - tx0 - 30, tcy = cy;
+      ctx.strokeStyle = "#e6e6e6";
+      ctx.beginPath(); ctx.moveTo(tx0, tcy); ctx.lineTo(tx0 + txL, tcy); ctx.stroke();
+      const mx = tx0 + txL/2 + x * (txL/2 * 0.85);
+      ctx.fillStyle = "#2563eb";
+      ctx.beginPath(); ctx.arc(mx, tcy, 8, 0, Math.PI*2); ctx.fill();
+      label(ctx, "proiezione MCU", 14, 18, "#2563eb", 12);
+    }
+    // Row 2: spring
+    {
+      const yC = rowH + rowH/2;
+      const wallX = 60;
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(wallX - 16, yC - 40, 6, 80);
+      const eqX = wallX + 250;
+      ctx.strokeStyle = "#cbd5e1"; ctx.setLineDash([3,4]);
+      ctx.beginPath(); ctx.moveTo(eqX, yC - 30); ctx.lineTo(eqX, yC + 30); ctx.stroke();
+      ctx.setLineDash([]);
+      const scale = 100;
+      const mx2 = eqX + x*scale;
+      ctx.strokeStyle = "#db2777"; ctx.lineWidth = 2;
+      springPath(ctx, wallX - 10, yC, mx2 - 22, 13, 8);
+      ctx.fillStyle = "#db2777";
+      ctx.fillRect(mx2 - 22, yC - 22, 44, 44);
+      label(ctx, "m", mx2 - 5, yC + 4, "white", 13);
+      label(ctx, "molla   F = −kx", 14, rowH + 18, "#db2777", 12);
+    }
+    // Row 3: pendulum
+    {
+      const pivY = 2*rowH + 20;
+      const pivX = W/2;
+      const L = 110;
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(pivX - 30, pivY - 6, 60, 4);
+      ctx.strokeStyle = "#cfd4dc"; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(pivX, pivY + L + 24); ctx.stroke();
+      ctx.setLineDash([]);
+      const th0 = 0.35;
+      const theta = th0 * Math.cos(phase);
+      const bx = pivX + L*Math.sin(theta);
+      const by = pivY + L*Math.cos(theta);
+      ctx.strokeStyle = "#d97706"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.fillStyle = "#d97706";
+      ctx.beginPath(); ctx.arc(bx, by, 12, 0, Math.PI*2); ctx.fill();
+      label(ctx, "pendolo (piccoli angoli)   F ≈ −mg θ", 14, 2*rowH + 18, "#d97706", 12);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
