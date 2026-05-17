@@ -537,8 +537,8 @@
       <div class="panel prose">
         <h3>Derivazione</h3>
         <p>Partiamo da $x(t) = A\cos(\omega t + \varphi_0)$ e deriviamo:</p>
-        <div class="formula">$$v(t) = \dot x = -A\omega\sin(\omega t + \varphi_0)$$</div>
-        <div class="formula">$$a(t) = \ddot x = -A\omega^2\cos(\omega t + \varphi_0)$$</div>
+        <div class="formula">$$v(t) = -A\omega\sin(\omega t + \varphi_0)$$</div>
+        <div class="formula">$$a(t) = -A\omega^2\cos(\omega t + \varphi_0)$$</div>
         <p>Confrontando l'ultima espressione con $x(t)$ otteniamo la relazione che <em>caratterizza</em> il moto armonico:</p>
         <div class="formula">$$\boxed{\;a(t) = -\omega^2\, x(t)\;}$$</div>
         <p>L'accelerazione è proporzionale allo spostamento dalla posizione di equilibrio, e di segno opposto. Per la seconda legge di Newton $F = ma$:</p>
@@ -578,8 +578,8 @@
         <p>Per una molla ideale di costante elastica $k$, la forza di richiamo è la legge di Hooke:</p>
         <div class="formula">$$F = -k\,x$$</div>
         <p>Applicando la seconda legge di Newton al carrello di massa $m$:</p>
-        <div class="formula">$$m\ddot x = -k\,x \quad\Longrightarrow\quad \ddot x = -\dfrac{k}{m}\,x$$</div>
-        <p>Confrontando con la firma del moto armonico $\ddot x = -\omega^2 x$:</p>
+        <div class="formula">$$m\,a = -k\,x \quad\Longrightarrow\quad a = -\dfrac{k}{m}\,x$$</div>
+        <p>Confrontando con la firma del moto armonico $a = -\omega^2 x$:</p>
         <div class="formula">$$\omega^2 = \dfrac{k}{m} \quad\Longrightarrow\quad \omega = \sqrt{\dfrac{k}{m}}$$</div>
         <div class="formula">$$\boxed{\;T_{\text{molla}} = 2\pi\sqrt{\dfrac{m}{k}}\;}$$</div>
         <div class="insight"><strong>Implicazioni.</strong> Il periodo dipende solo da $m$ e $k$, <em>non</em> dall'ampiezza $A$ (isocronismo). Una molla più rigida (più $k$) o una massa più leggera danno oscillazioni più rapide.</div>
@@ -615,11 +615,11 @@
         <h3>Ricavare il periodo</h3>
         <p>Sia $\theta$ l'angolo del filo rispetto alla verticale. Lungo la direzione tangenziale alla traiettoria, sulla massa $m$ agisce la componente del peso:</p>
         <div class="formula">$$F_t = -mg\sin\theta$$</div>
-        <p>Lo spostamento sulla traiettoria circolare è $s = L\theta$, dunque $\ddot s = L\ddot\theta$. Newton:</p>
-        <div class="formula">$$mL\ddot\theta = -mg\sin\theta \;\Longrightarrow\; \ddot\theta = -\dfrac{g}{L}\sin\theta$$</div>
-        <p>Per <em>piccoli angoli</em>, $\sin\theta \approx \theta$ (sviluppo di Taylor al primo ordine):</p>
-        <div class="formula">$$\ddot\theta \approx -\dfrac{g}{L}\,\theta$$</div>
-        <p>Stessa firma del moto armonico, con</p>
+        <p>Lungo la traiettoria, lo spostamento dalla verticale è l'arco $s = L\theta$. La seconda legge di Newton in direzione tangenziale, con $a$ accelerazione lungo l'arco, dà:</p>
+        <div class="formula">$$m\,a = -mg\sin\theta \;\Longrightarrow\; a = -g\sin\theta$$</div>
+        <p>Per <em>piccoli angoli</em>, $\sin\theta \approx \theta = s/L$ (sviluppo di Taylor al primo ordine):</p>
+        <div class="formula">$$a \approx -\dfrac{g}{L}\,s$$</div>
+        <p>Stessa firma del moto armonico $a = -\omega^2 s$, con</p>
         <div class="formula">$$\omega^2 = \dfrac{g}{L} \;\Longrightarrow\; \boxed{\;T_{\text{pendolo}} = 2\pi\sqrt{\dfrac{L}{g}}\;}$$</div>
         <div class="insight"><strong>Attenzione.</strong> A differenza della molla, il pendolo è armonico solo in <em>approssimazione</em>. Aumentando l'ampiezza il periodo cresce: l'isocronismo di Galileo vale rigorosamente solo per piccole oscillazioni.</div>
         <p>Valori attuali: $T = $ <span id="pend-T">…</span> s, $f = $ <span id="pend-f">…</span> Hz.</p>
@@ -1370,7 +1370,7 @@ function now() { return (performance.now() - t0) / 1000; }
     const dt = t - lastT;
     if (playing.pend) {
       phase += dt * w;
-      // integrate exact ODE: ddθ = -g/L sin θ (semi-implicit Euler, small steps)
+      // integrate exact ODE: angular acceleration = -g/L sin θ (semi-implicit Euler, small steps)
       if (showExact) {
         const steps = 8;
         const h = dt/steps;
@@ -1661,7 +1661,7 @@ const QUIZZES = {
   },
   4: {
     teoria: [
-      { q: "Quale equazione caratterizza il MAS?", opts: ["$\\ddot x=\\omega x$","$\\ddot x=-\\omega^2 x$","$\\dot x=-\\omega x$","$\\ddot x=-\\omega^2 x^2$"], correct: 1, exp: "$\\ddot x=-\\omega^2 x$: accelerazione proporzionale e opposta allo spostamento." },
+      { q: "Quale equazione caratterizza il MAS?", opts: ["$a=\\omega x$","$a=-\\omega^2 x$","$v=-\\omega x$","$a=-\\omega^2 x^2$"], correct: 1, exp: "$a=-\\omega^2 x$: accelerazione proporzionale e opposta allo spostamento." },
       { q: "Una forza di richiamo lineare ha la forma:", opts: ["$F=kx$","$F=-kx$","$F=-kx^2$","$F=k$"], correct: 1, exp: "$F=-kx$ con $k>0$: rivolta verso l'equilibrio, proporzionale allo spostamento." },
       { q: "Per $x(t)=A\\cos(\\omega t)$, la velocità iniziale $v(0)$ è:", opts: ["$A\\omega$","$0$","$-A\\omega$","$A$"], correct: 1, exp: "$v(t)=-A\\omega\\sin(\\omega t)$, e $\\sin0=0$." },
       { q: "Per $x(t)=A\\cos(\\omega t)$, l'accelerazione iniziale $a(0)$ è:", opts: ["$0$","$-A\\omega$","$-A\\omega^2$","$A\\omega^2$"], correct: 2, exp: "$a(t)=-A\\omega^2\\cos(\\omega t)$, in $t=0$ vale $-A\\omega^2$." },
@@ -1693,7 +1693,7 @@ const QUIZZES = {
       { q: "Una molla più rigida (k maggiore) produce oscillazioni:", opts: ["più lente","più veloci","di uguale periodo","che si smorzano"], correct: 1, exp: "$T\\propto1/\\sqrt k$: più $k$, meno $T$, oscillazioni più rapide." },
       { q: "Aumentando la massa (a $k$ fisso) le oscillazioni diventano:", opts: ["più rapide","più lente","invariate","instabili"], correct: 1, exp: "$T\\propto\\sqrt m$: più massa, più periodo." },
       { q: "Il segno meno in $F=-kx$ indica che la forza:", opts: ["è sempre positiva","si oppone allo spostamento dall'equilibrio","è costante","dipende dalla velocità"], correct: 1, exp: "La forza punta sempre verso $x=0$." },
-      { q: "Per la molla, $\\omega^2$ vale:", opts: ["$k/m$","$m/k$","$kg$","$g/L$"], correct: 0, exp: "Da $m\\ddot x=-kx$ segue $\\ddot x=-(k/m)x$, quindi $\\omega^2=k/m$." },
+      { q: "Per la molla, $\\omega^2$ vale:", opts: ["$k/m$","$m/k$","$kg$","$g/L$"], correct: 0, exp: "Da $m\\,a=-kx$ segue $a=-(k/m)x$, quindi $\\omega^2=k/m$." },
       { q: "Per una molla orizzontale, nel punto di equilibrio la forza elastica è:", opts: ["massima","nulla","uguale al peso","diretta verso l'alto"], correct: 1, exp: "Nell'equilibrio $x=0$, quindi $F=-kx=0$." },
       { q: "L'energia potenziale elastica di una molla vale:", opts: ["$kx$","$\\tfrac12 kx^2$","$\\tfrac12 kx$","$kx^2$"], correct: 1, exp: "$U=\\tfrac12 kx^2$." },
       { q: "La velocità della massa è massima:", opts: ["agli estremi","al passaggio per l'equilibrio","a molla massimamente compressa","mai"], correct: 1, exp: "Nel punto di equilibrio l'energia è tutta cinetica." }
@@ -1739,7 +1739,7 @@ const QUIZZES = {
   },
   7: {
     teoria: [
-      { q: "Cosa hanno in comune molla e pendolo?", opts: ["la stessa costante $k$","la stessa equazione $\\ddot x=-\\omega^2 x$","lo stesso periodo","la stessa origine della forza"], correct: 1, exp: "Entrambi obbediscono all'equazione del MAS." },
+      { q: "Cosa hanno in comune molla e pendolo?", opts: ["la stessa costante $k$","la stessa equazione $a=-\\omega^2 x$","lo stesso periodo","la stessa origine della forza"], correct: 1, exp: "Entrambi obbediscono all'equazione del MAS." },
       { q: "Cosa cambia tra molla e pendolo?", opts: ["la forma matematica del moto","il significato fisico di $\\omega^2$","il fatto di essere periodici","nulla"], correct: 1, exp: "$\\omega^2=k/m$ per la molla, $\\omega^2=g/L$ per il pendolo." },
       { q: "Raddoppiando la massa, i periodi:", opts: ["crescono entrambi di $\\sqrt2$","solo la molla cresce di $\\sqrt2$, il pendolo resta uguale","restano entrambi uguali","solo il pendolo cresce"], correct: 1, exp: "$T_\\text{molla}\\propto\\sqrt m$; $T_\\text{pend}$ non dipende da $m$." },
       { q: "Il moto armonico semplice equivale geometricamente a:", opts: ["la proiezione di un MCU su un diametro","un moto uniformemente accelerato","un moto rettilineo uniforme","una caduta libera"], correct: 0, exp: "Ogni MAS è la proiezione di un MCU." },
