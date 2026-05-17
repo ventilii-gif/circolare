@@ -648,3 +648,1221 @@
           <div class="ctrl"><label>$\omega$ comune (rad/s)</label><input type="range" id="s-sum-w" min="0.5" max="3" step="0.05" value="1.5"><span class="val" id="v-sum-w">1.50</span></div>
         </div>
       </div>
+      <div class="panel prose">
+        <h3>Tabella sinottica</h3>
+        <table class="compare">
+          <thead>
+            <tr><th>Sistema</th><th>Forza di richiamo</th><th>$\omega^2$</th><th>Periodo $T$</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Proiezione del MCU</td>
+              <td>(definizione cinematica)</td>
+              <td>$\omega^2$</td>
+              <td>$2\pi/\omega$</td>
+            </tr>
+            <tr>
+              <td>Molla — massa $m$</td>
+              <td>$F=-kx$</td>
+              <td>$k/m$</td>
+              <td>$2\pi\sqrt{m/k}$</td>
+            </tr>
+            <tr>
+              <td>Pendolo (piccoli angoli)</td>
+              <td>$F_t \approx -mg\,\theta$</td>
+              <td>$g/L$</td>
+              <td>$2\pi\sqrt{L/g}$</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="insight" style="margin-top:18px;">
+          <strong>Lettura unitaria.</strong> Ogni moto armonico semplice è "geometricamente equivalente" alla proiezione di un moto circolare uniforme su un diametro. La differenza fra molla e pendolo sta solo nel <em>contenuto fisico</em> di $\omega$: dipende dalla rigidezza in un caso, dalla geometria del campo gravitazionale nell'altro.
+        </div>
+        <p style="margin-top:14px;"><strong>Domanda di verifica.</strong> Se raddoppi la massa di una molla, di quanto cambia il periodo? E quello di un pendolo? <em>(Risposta: la molla rallenta di $\sqrt 2$, il pendolo non cambia — la massa non compare in $T_{\text{pend}}$.)</em></p>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button class="ghost" data-prev>← Indietro</button>
+      <button class="ghost" id="b-restart">↻ Ricomincia</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ============================================================
+//  STEPPER NAVIGATION
+// ============================================================
+const STEP_TITLES = [
+  "MCU",
+  "Vettori",
+  "Proiezione",
+  "Dinamica MAS",
+  "Molla",
+  "Pendolo",
+  "Sintesi"
+];
+const stepperEl = document.getElementById("stepper");
+STEP_TITLES.forEach((t, i) => {
+  const b = document.createElement("button");
+  b.innerHTML = `<span class="num">${i+1}</span>${t}`;
+  b.dataset.go = i+1;
+  b.addEventListener("click", () => goStep(i+1));
+  stepperEl.appendChild(b);
+});
+function goStep(n) {
+  document.querySelectorAll(".step").forEach(s => s.classList.toggle("active", +s.dataset.step === n));
+  document.querySelectorAll(".stepper button").forEach(b => b.classList.toggle("active", +b.dataset.go === n));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.querySelectorAll("[data-next]").forEach(b => b.addEventListener("click", () => {
+  const cur = +b.closest(".step").dataset.step;
+  if (cur < STEP_TITLES.length) goStep(cur + 1);
+}));
+document.querySelectorAll("[data-prev]").forEach(b => b.addEventListener("click", () => {
+  const cur = +b.closest(".step").dataset.step;
+  if (cur > 1) goStep(cur - 1);
+}));
+document.getElementById("b-restart").addEventListener("click", () => goStep(1));
+goStep(1);
+
+// ============================================================
+//  CANVAS HELPERS (HiDPI)
+// ============================================================
+function fitCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = cv.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return null;
+  const needW = Math.round(rect.width * dpr);
+  const needH = Math.round(rect.height * dpr);
+  if (cv.width !== needW || cv.height !== needH) {
+    cv.width = needW;
+    cv.height = needH;
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
+}
+function arrow(ctx, x1, y1, x2, y2, color, width=2) {
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  const head = 9;
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - head*Math.cos(ang - 0.4), y2 - head*Math.sin(ang - 0.4));
+  ctx.lineTo(x2 - head*Math.cos(ang + 0.4), y2 - head*Math.sin(ang + 0.4));
+  ctx.closePath(); ctx.fill();
+}
+function label(ctx, txt, x, y, color="#1a1a1a", size=13) {
+  ctx.fillStyle = color;
+  ctx.font = `500 ${size}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(txt, x, y);
+}
+
+// ============================================================
+//  GLOBAL CLOCK
+// ============================================================
+let t0 = performance.now();
+const playing = { intro: true, vect: true, proj: true, deriv: true, spring: true, pend: true, sum: true };
+function now() { return (performance.now() - t0) / 1000; }
+
+// ============================================================
+//  STEP 1: INTRO
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-intro");
+  let ctx;
+  const sR = document.getElementById("s-intro-r"), vR = document.getElementById("v-intro-r");
+  const sW = document.getElementById("s-intro-w"), vW = document.getElementById("v-intro-w");
+  const btn = document.getElementById("b-intro-play");
+  const btnR = document.getElementById("b-intro-reset");
+  let phase = 0, lastT = now();
+
+  sR.addEventListener("input", () => vR.textContent = (+sR.value).toFixed(2));
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+  btn.addEventListener("click", () => { playing.intro = !playing.intro; btn.textContent = playing.intro ? "Pausa" : "Play"; });
+  btnR.addEventListener("click", () => { phase = 0; });
+
+  function draw() {
+    const _c = fitCanvas(cv); if (!_c) { lastT = now(); requestAnimationFrame(draw); return; } ctx = _c;
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+    const cx = W/2, cy = H/2;
+    const scale = Math.min(W, H) * 0.35;
+    const r = +sR.value, w = +sW.value;
+    const t = now();
+    if (playing.intro) phase += (t - lastT) * w;
+    lastT = t;
+
+    // circle
+    ctx.strokeStyle = "#cfd4dc"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r*scale, 0, Math.PI*2); ctx.stroke();
+    // axes
+    ctx.strokeStyle = "#e6e6e6"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - r*scale - 30, cy); ctx.lineTo(cx + r*scale + 30, cy);
+    ctx.moveTo(cx, cy - r*scale - 30); ctx.lineTo(cx, cy + r*scale + 30);
+    ctx.stroke();
+
+    // point
+    const px = cx + r*scale*Math.cos(phase);
+    const py = cy - r*scale*Math.sin(phase);
+    // radius
+    arrow(ctx, cx, cy, px, py, "#2563eb", 2.2);
+    // angle arc
+    ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, 26, 0, -phase, true); ctx.stroke();
+    label(ctx, "θ", cx + 32, cy - 6, "#64748b", 13);
+
+    // dot
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI*2); ctx.fill();
+
+    label(ctx, "O", cx - 14, cy + 16, "#64748b");
+    label(ctx, "P", px + 10, py - 8, "#1a1a1a");
+    label(ctx, `r = ${r.toFixed(2)} m`, 14, 22, "#2563eb");
+    label(ctx, `ω = ${w.toFixed(2)} rad/s   T = ${(2*Math.PI/w).toFixed(2)} s   v = ${(w*r).toFixed(2)} m/s`, 14, 42, "#64748b");
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 2: VECTORS
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-vect");
+  let ctx;
+  const sW = document.getElementById("s-vect-w"), vW = document.getElementById("v-vect-w");
+  const btn = document.getElementById("b-vect-play");
+  let phase = 0, lastT = now();
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+  btn.addEventListener("click", () => { playing.vect = !playing.vect; btn.textContent = playing.vect ? "Pausa" : "Play"; });
+
+  function draw() {
+    const _c = fitCanvas(cv); if (!_c) { lastT = now(); requestAnimationFrame(draw); return; } ctx = _c;
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+    const cx = W/2, cy = H/2;
+    const scale = Math.min(W, H) * 0.32;
+    const r = 1.3, w = +sW.value;
+    const t = now();
+    if (playing.vect) phase += (t - lastT) * w;
+    lastT = t;
+
+    ctx.strokeStyle = "#cfd4dc"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r*scale, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = "#eee";
+    ctx.beginPath();
+    ctx.moveTo(cx - r*scale - 30, cy); ctx.lineTo(cx + r*scale + 30, cy);
+    ctx.moveTo(cx, cy - r*scale - 30); ctx.lineTo(cx, cy + r*scale + 30);
+    ctx.stroke();
+
+    const px = cx + r*scale*Math.cos(phase);
+    const py = cy - r*scale*Math.sin(phase);
+
+    // position vector
+    arrow(ctx, cx, cy, px, py, "#2563eb", 2);
+    label(ctx, "r", (cx+px)/2 + 8, (cy+py)/2 - 6, "#2563eb", 14);
+
+    // velocity vector (tangent): perpendicular to r, rotated 90 ccw, length proportional to ω r
+    const vLen = (w*r) * scale * 0.4;
+    const vx = px - vLen*Math.sin(phase);
+    const vy = py - vLen*Math.cos(phase);
+    arrow(ctx, px, py, vx, vy, "#059669", 2);
+    label(ctx, "v", vx + 6, vy - 6, "#059669", 14);
+
+    // acceleration vector: centripetal, from P towards O, length ω²r
+    const aLen = (w*w*r) * scale * 0.18;
+    const ax = px + aLen*(cx - px)/(r*scale);
+    const ay = py + aLen*(cy - py)/(r*scale);
+    arrow(ctx, px, py, ax, ay, "#d97706", 2);
+    label(ctx, "a", ax + 6, ay + 14, "#d97706", 14);
+
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#94a3b8";
+    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill();
+
+    label(ctx, `|v| = ω·r = ${(w*r).toFixed(2)} m/s`, 14, 22, "#059669");
+    label(ctx, `|a| = ω²·r = ${(w*w*r).toFixed(2)} m/s²`, 14, 42, "#d97706");
+    label(ctx, "v ⊥ r,  a = −ω² r  →  a punta verso O", 14, H - 14, "#64748b", 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 3: PROJECTION + plot
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-proj");
+  const cp = document.getElementById("cv-proj-plot");
+  let ctx, ctxP;
+  const sR = document.getElementById("s-proj-r"), vR = document.getElementById("v-proj-r");
+  const sW = document.getElementById("s-proj-w"), vW = document.getElementById("v-proj-w");
+  const sP = document.getElementById("s-proj-p"), vP = document.getElementById("v-proj-p");
+  const btn = document.getElementById("b-proj-play");
+  sR.addEventListener("input", () => vR.textContent = (+sR.value).toFixed(2));
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+  sP.addEventListener("input", () => vP.textContent = (+sP.value).toFixed(2));
+  btn.addEventListener("click", () => { playing.proj = !playing.proj; btn.textContent = playing.proj ? "Pausa" : "Play"; });
+
+  let phase = 0, lastT = now();
+
+  function draw() {
+    const _c = fitCanvas(cv); const _p = fitCanvas(cp);
+    if (!_c || !_p) { lastT = now(); requestAnimationFrame(draw); return; }
+    ctx = _c; ctxP = _p;
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const r = +sR.value, w = +sW.value, p0 = +sP.value;
+    const t = now();
+    if (playing.proj) phase += (t - lastT) * w;
+    lastT = t;
+    const ang = phase + p0;
+
+    const cx = W*0.40, cy = H*0.5;
+    const scale = Math.min(W, H) * 0.32;
+
+    // axes
+    ctx.strokeStyle = "#eaeaea";
+    ctx.beginPath();
+    ctx.moveTo(cx - r*scale - 20, cy); ctx.lineTo(W - 20, cy);
+    ctx.moveTo(cx, cy - r*scale - 20); ctx.lineTo(cx, cy + r*scale + 20);
+    ctx.stroke();
+
+    // circle
+    ctx.strokeStyle = "#cfd4dc"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r*scale, 0, Math.PI*2); ctx.stroke();
+
+    // diameter (projection axis) highlighted
+    ctx.strokeStyle = "#fbb6ce"; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(cx - r*scale, cy); ctx.lineTo(cx + r*scale, cy); ctx.stroke();
+    ctx.lineCap = "butt";
+
+    const px = cx + r*scale*Math.cos(ang);
+    const py = cy - r*scale*Math.sin(ang);
+
+    // ===== three vectors anchored at P =====
+    // position vector r (blue)
+    arrow(ctx, cx, cy, px, py, "#2563eb", 2);
+    // velocity vector v (green, tangent)
+    let vLen = (w*r) * scale * 0.30;
+    vLen = Math.min(vLen, r*scale*0.85);
+    const vTipX = px - vLen*Math.sin(ang);
+    const vTipY = py - vLen*Math.cos(ang);
+    arrow(ctx, px, py, vTipX, vTipY, "#059669", 2);
+    // acceleration vector a (orange, centripetal)
+    let aLen = (w*w*r) * scale * 0.12;
+    aLen = Math.min(aLen, r*scale*0.70);
+    const aTipX = px + aLen*(cx - px)/(r*scale);
+    const aTipY = py + aLen*(cy - py)/(r*scale);
+    arrow(ctx, px, py, aTipX, aTipY, "#d97706", 2);
+
+    label(ctx, "r", (cx+px)/2 + 7, (cy+py)/2 - 4, "#2563eb", 13);
+    label(ctx, "v", vTipX + 7, vTipY - 4, "#059669", 13);
+    label(ctx, "a", aTipX + 7, aTipY + 13, "#d97706", 13);
+
+    // ===== dashed projectors down to the diameter =====
+    const vLineY = cy - 24, aLineY = cy + 24;
+    ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+    ctx.strokeStyle = "#93c5fd";
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, cy); ctx.stroke();
+    ctx.strokeStyle = "#6ee7b7";
+    ctx.beginPath(); ctx.moveTo(vTipX, vTipY); ctx.lineTo(vTipX, vLineY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, cy); ctx.lineTo(px, vLineY); ctx.stroke();
+    ctx.strokeStyle = "#fcd34d";
+    ctx.beginPath(); ctx.moveTo(aTipX, aTipY); ctx.lineTo(aTipX, aLineY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, cy); ctx.lineTo(px, aLineY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ===== projected vectors on / parallel to the diameter =====
+    // x(t): projection of r  (O -> shadow, on the diameter)
+    arrow(ctx, cx, cy, px, cy, "#2563eb", 3);
+    // vx: projection of velocity  (above the diameter)
+    arrow(ctx, px, vLineY, vTipX, vLineY, "#059669", 3);
+    // ax: projection of acceleration  (below the diameter)
+    arrow(ctx, px, aLineY, aTipX, aLineY, "#d97706", 3);
+
+    // point on circle
+    ctx.fillStyle = "#2563eb";
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI*2); ctx.fill();
+    // shadow on diameter
+    ctx.fillStyle = "#db2777";
+    ctx.beginPath(); ctx.arc(px, cy, 7, 0, Math.PI*2); ctx.fill();
+
+    label(ctx, "P", px + 11, py - 9, "#2563eb");
+    label(ctx, "x(t)", px - 14, cy + 44, "#db2777", 12);
+
+    const xVal = r*Math.cos(ang);
+    const vVal = -r*w*Math.sin(ang);
+    const aVal = -r*w*w*Math.cos(ang);
+    label(ctx, `x  = ${xVal.toFixed(2)} m`, 14, 22, "#2563eb", 12);
+    label(ctx, `vₓ = ${vVal.toFixed(2)} m/s`, 14, 40, "#059669", 12);
+    label(ctx, `aₓ = ${aVal.toFixed(2)} m/s²`, 14, 58, "#d97706", 12);
+
+    // ----- plot x(t) -----
+    const pRect = cp.getBoundingClientRect();
+    const PW = pRect.width, PH = pRect.height;
+    ctxP.clearRect(0, 0, PW, PH);
+    const pad = 30;
+    // axes
+    ctxP.strokeStyle = "#e6e6e6";
+    ctxP.beginPath();
+    ctxP.moveTo(pad, pad); ctxP.lineTo(pad, PH - pad);
+    ctxP.lineTo(PW - 10, PH - pad);
+    ctxP.stroke();
+    // labels
+    label(ctxP, "x", pad - 22, pad + 4, "#64748b");
+    label(ctxP, "t", PW - 18, PH - pad + 14, "#64748b");
+
+    // mid line
+    const midY = (pad + (PH - pad)) / 2;
+    ctxP.strokeStyle = "#eee";
+    ctxP.beginPath(); ctxP.moveTo(pad, midY); ctxP.lineTo(PW - 10, midY); ctxP.stroke();
+
+    // window of 3 periods
+    const Tper = 2*Math.PI / w;
+    const tWindow = 3 * Tper;
+    const xToPx = (tt) => pad + (tt / tWindow) * (PW - pad - 10);
+    const yToPx = (xx) => midY - (xx / r) * ((PH - 2*pad) / 2 * 0.9);
+
+    // curve covering full window aligned so that current time corresponds to phase
+    ctxP.strokeStyle = "#db2777"; ctxP.lineWidth = 2;
+    ctxP.beginPath();
+    const tNow = (phase + p0) / w; // virtual "time" mapping
+    for (let i = 0; i <= 400; i++) {
+      const tt = (i / 400) * tWindow;
+      const xx = r * Math.cos(w * tt + p0);
+      const X = xToPx(tt), Y = yToPx(xx);
+      if (i === 0) ctxP.moveTo(X, Y); else ctxP.lineTo(X, Y);
+    }
+    ctxP.stroke();
+
+    // current marker: time corresponds to ang mapped into [0, tWindow]
+    const tMark = ((tNow % tWindow) + tWindow) % tWindow;
+    const xx = r * Math.cos(ang);
+    const MX = xToPx(tMark), MY = yToPx(xx);
+    ctxP.fillStyle = "#db2777";
+    ctxP.beginPath(); ctxP.arc(MX, MY, 5, 0, Math.PI*2); ctxP.fill();
+
+    label(ctxP, `x(t) = r·cos(ωt + φ₀)`, PW - 200, pad + 4, "#db2777", 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 4: DERIVATION (small anim + 3 stacked plots)
+// ============================================================
+(() => {
+  const cvA = document.getElementById("cv-deriv-anim");
+  const cvP = document.getElementById("cv-deriv-plot");
+  let ctxA, ctxP;
+  const sA = document.getElementById("s-deriv-A"), vA = document.getElementById("v-deriv-A");
+  const sW = document.getElementById("s-deriv-w"), vW = document.getElementById("v-deriv-w");
+  sA.addEventListener("input", () => vA.textContent = (+sA.value).toFixed(2));
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+
+  let phase = 0, lastT = now();
+
+  function draw() {
+    const _a = fitCanvas(cvA); const _p = fitCanvas(cvP);
+    if (!_a || !_p) { lastT = now(); requestAnimationFrame(draw); return; }
+    ctxA = _a; ctxP = _p;
+    const A = +sA.value, w = +sW.value;
+    const t = now();
+    if (playing.deriv) phase += (t - lastT) * w;
+    lastT = t;
+
+    // ----- top: circle + projection on horizontal line below -----
+    const aRect = cvA.getBoundingClientRect();
+    const W = aRect.width, H = aRect.height;
+    ctxA.clearRect(0, 0, W, H);
+    const cx = 130, cy = H/2;
+    const scale = Math.min(H * 0.4, 100);
+    ctxA.strokeStyle = "#cfd4dc";
+    ctxA.beginPath(); ctxA.arc(cx, cy, A*scale, 0, Math.PI*2); ctxA.stroke();
+    // diameter
+    ctxA.strokeStyle = "#fbb6ce"; ctxA.lineWidth = 3;
+    ctxA.beginPath(); ctxA.moveTo(cx - A*scale, cy); ctxA.lineTo(cx + A*scale, cy); ctxA.stroke();
+    ctxA.lineWidth = 1;
+    const ang = phase;
+    const px = cx + A*scale*Math.cos(ang);
+    const py = cy - A*scale*Math.sin(ang);
+    ctxA.strokeStyle = "#9ca3af"; ctxA.setLineDash([4,4]);
+    ctxA.beginPath(); ctxA.moveTo(px, py); ctxA.lineTo(px, cy); ctxA.stroke();
+    ctxA.setLineDash([]);
+    ctxA.fillStyle = "#2563eb"; ctxA.beginPath(); ctxA.arc(px, py, 6, 0, Math.PI*2); ctxA.fill();
+    ctxA.fillStyle = "#db2777"; ctxA.beginPath(); ctxA.arc(px, cy, 8, 0, Math.PI*2); ctxA.fill();
+
+    // horizontal track to the right
+    const trackY = cy;
+    const trackX0 = cx + A*scale + 40;
+    const trackLen = W - trackX0 - 30;
+    ctxA.strokeStyle = "#e6e6e6";
+    ctxA.beginPath(); ctxA.moveTo(trackX0, trackY); ctxA.lineTo(trackX0 + trackLen, trackY); ctxA.stroke();
+    // equilibrium mark and amplitude marks
+    const cTrack = trackX0 + trackLen/2;
+    ctxA.strokeStyle = "#bbb";
+    ctxA.beginPath(); ctxA.moveTo(cTrack, trackY - 14); ctxA.lineTo(cTrack, trackY + 14); ctxA.stroke();
+    const xPos = A * Math.cos(ang);
+    const mPx = cTrack + (xPos / A) * (trackLen/2 * 0.85);
+    ctxA.fillStyle = "#db2777";
+    ctxA.beginPath(); ctxA.arc(mPx, trackY, 10, 0, Math.PI*2); ctxA.fill();
+    label(ctxA, "equilibrio", cTrack - 28, trackY + 30, "#94a3b8", 11);
+    label(ctxA, "x(t) ricavato come proiezione", trackX0, 20, "#db2777", 12);
+
+    // ----- bottom: three stacked plots -----
+    const pRect = cvP.getBoundingClientRect();
+    const PW = pRect.width, PH = pRect.height;
+    ctxP.clearRect(0, 0, PW, PH);
+    const pad = 28;
+    const plotH = (PH - 4*pad) / 3;
+    const Tper = 2*Math.PI / w;
+    const tWindow = 2.5 * Tper;
+    const yScale = { x: A, v: A*w, a: A*w*w };
+    const colors = { x: "#db2777", v: "#059669", a: "#d97706" };
+    const labels = {
+      x: "x(t) = A cos(ωt)",
+      v: "v(t) = −Aω sin(ωt)",
+      a: "a(t) = −Aω² cos(ωt) = −ω² x(t)"
+    };
+    const fns = {
+      x: (tt) => A*Math.cos(w*tt),
+      v: (tt) => -A*w*Math.sin(w*tt),
+      a: (tt) => -A*w*w*Math.cos(w*tt)
+    };
+
+    const keys = ["x", "v", "a"];
+    const tNow = phase / w;
+    const tMark = ((tNow % tWindow) + tWindow) % tWindow;
+
+    keys.forEach((k, idx) => {
+      const top = pad + idx * (plotH + pad);
+      const bot = top + plotH;
+      const mid = (top + bot)/2;
+      // frame
+      ctxP.strokeStyle = "#e6e6e6";
+      ctxP.beginPath();
+      ctxP.moveTo(pad, top); ctxP.lineTo(pad, bot);
+      ctxP.lineTo(PW - 10, bot);
+      ctxP.stroke();
+      // zero line
+      ctxP.strokeStyle = "#eee";
+      ctxP.beginPath(); ctxP.moveTo(pad, mid); ctxP.lineTo(PW - 10, mid); ctxP.stroke();
+      // curve
+      ctxP.strokeStyle = colors[k]; ctxP.lineWidth = 2;
+      ctxP.beginPath();
+      const ymax = yScale[k];
+      for (let i = 0; i <= 400; i++) {
+        const tt = (i/400) * tWindow;
+        const val = fns[k](tt);
+        const X = pad + (tt/tWindow) * (PW - pad - 10);
+        const Y = mid - (val/ymax) * (plotH/2 * 0.85);
+        if (i === 0) ctxP.moveTo(X, Y); else ctxP.lineTo(X, Y);
+      }
+      ctxP.stroke();
+      // current marker
+      const valNow = fns[k](tMark);
+      const MX = pad + (tMark/tWindow) * (PW - pad - 10);
+      const MY = mid - (valNow/ymax) * (plotH/2 * 0.85);
+      ctxP.fillStyle = colors[k];
+      ctxP.beginPath(); ctxP.arc(MX, MY, 5, 0, Math.PI*2); ctxP.fill();
+      label(ctxP, labels[k], pad + 6, top + 13, colors[k], 12);
+    });
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 5: SPRING
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-spring");
+  const cp = document.getElementById("cv-spring-plot");
+  let ctx, ctxP;
+  const sM = document.getElementById("s-spring-m"), vM = document.getElementById("v-spring-m");
+  const sK = document.getElementById("s-spring-k"), vK = document.getElementById("v-spring-k");
+  const sA = document.getElementById("s-spring-A"), vAA = document.getElementById("v-spring-A");
+  const btn = document.getElementById("b-spring-play");
+  const tEl = document.getElementById("spring-T"), fEl = document.getElementById("spring-f");
+  sM.addEventListener("input", () => vM.textContent = (+sM.value).toFixed(1));
+  sK.addEventListener("input", () => vK.textContent = (+sK.value).toFixed(1));
+  sA.addEventListener("input", () => vAA.textContent = (+sA.value).toFixed(2));
+  btn.addEventListener("click", () => { playing.spring = !playing.spring; btn.textContent = playing.spring ? "Pausa" : "Play"; });
+
+  let phase = 0, lastT = now();
+
+  function springPath(ctx, x0, y, x1, coils=14, amp=10) {
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    const L = x1 - x0;
+    const N = 80;
+    for (let i = 1; i <= N; i++) {
+      const t = i/N;
+      const xx = x0 + L*t;
+      let yy = y;
+      if (t > 0.06 && t < 0.94) {
+        yy = y + Math.sin(t * coils * Math.PI * 2) * amp;
+      }
+      ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+
+  function draw() {
+    const _c = fitCanvas(cv); const _p = fitCanvas(cp);
+    if (!_c || !_p) { lastT = now(); requestAnimationFrame(draw); return; }
+    ctx = _c; ctxP = _p;
+    const m = +sM.value, k = +sK.value, A = +sA.value;
+    const w = Math.sqrt(k/m);
+    const Tper = 2*Math.PI/w;
+    tEl.textContent = Tper.toFixed(2);
+    fEl.textContent = (1/Tper).toFixed(2);
+    const t = now();
+    if (playing.spring) phase += (t - lastT) * w;
+    lastT = t;
+    const x = A * Math.cos(phase);
+    const v = -A*w*Math.sin(phase);
+    const a = -A*w*w*Math.cos(phase);
+
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // wall
+    const wallX = 60;
+    const trackY = H * 0.55;
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(wallX - 20, trackY - 90, 8, 180);
+    // hatch
+    ctx.strokeStyle = "#1a1a1a";
+    for (let i = -90; i < 90; i += 12) {
+      ctx.beginPath(); ctx.moveTo(wallX - 20, trackY + i); ctx.lineTo(wallX - 32, trackY + i + 8); ctx.stroke();
+    }
+    // floor
+    ctx.strokeStyle = "#cfd4dc";
+    ctx.beginPath(); ctx.moveTo(wallX, trackY + 50); ctx.lineTo(W - 30, trackY + 50); ctx.stroke();
+    // equilibrium line
+    const eqX = wallX + 250;
+    ctx.strokeStyle = "#cbd5e1"; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(eqX, trackY - 60); ctx.lineTo(eqX, trackY + 50); ctx.stroke();
+    ctx.setLineDash([]);
+    label(ctx, "x = 0", eqX - 18, trackY + 68, "#94a3b8", 11);
+
+    // mass position
+    const scale = 100;
+    const massX = eqX + x*scale;
+    // spring
+    ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 2;
+    springPath(ctx, wallX - 12, trackY, massX - 28, 16, 10);
+    // mass block
+    ctx.fillStyle = "#db2777";
+    ctx.fillRect(massX - 28, trackY - 28, 56, 56);
+    ctx.strokeStyle = "#9d174d"; ctx.lineWidth = 2;
+    ctx.strokeRect(massX - 28, trackY - 28, 56, 56);
+    label(ctx, "m", massX - 6, trackY + 4, "white", 14);
+
+    // arrow showing force direction
+    if (Math.abs(x) > 0.01) {
+      const Fdir = -Math.sign(x);
+      arrow(ctx, massX, trackY - 50, massX + Fdir*60, trackY - 50, "#0ea5e9", 2);
+      label(ctx, "F = −kx", massX + Fdir*30 - 22, trackY - 58, "#0ea5e9", 12);
+    }
+
+    label(ctx, `x = ${x.toFixed(2)} m   v = ${v.toFixed(2)} m/s   a = ${a.toFixed(2)} m/s²`, 16, 22, "#64748b", 12);
+    label(ctx, `ω = √(k/m) = ${w.toFixed(2)} rad/s   T = 2π√(m/k) = ${Tper.toFixed(2)} s`, 16, 42, "#2563eb", 12);
+
+    // plot x(t)
+    const pRect = cp.getBoundingClientRect();
+    const PW = pRect.width, PH = pRect.height;
+    ctxP.clearRect(0, 0, PW, PH);
+    const pad = 22;
+    const mid = PH/2;
+    ctxP.strokeStyle = "#e6e6e6";
+    ctxP.beginPath();
+    ctxP.moveTo(pad, pad); ctxP.lineTo(pad, PH - pad);
+    ctxP.lineTo(PW - 8, PH - pad);
+    ctxP.stroke();
+    ctxP.strokeStyle = "#eee";
+    ctxP.beginPath(); ctxP.moveTo(pad, mid); ctxP.lineTo(PW - 8, mid); ctxP.stroke();
+    const tWin = 3*Tper;
+    ctxP.strokeStyle = "#db2777"; ctxP.lineWidth = 2;
+    ctxP.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const tt = i/400 * tWin;
+      const xx = A*Math.cos(w*tt);
+      const X = pad + (tt/tWin) * (PW - pad - 8);
+      const Y = mid - (xx/A) * (PH/2 - pad) * 0.85;
+      if (i === 0) ctxP.moveTo(X, Y); else ctxP.lineTo(X, Y);
+    }
+    ctxP.stroke();
+    const tNow = phase / w;
+    const tMark = ((tNow % tWin) + tWin) % tWin;
+    const MX = pad + (tMark/tWin) * (PW - pad - 8);
+    const MY = mid - (x/A) * (PH/2 - pad) * 0.85;
+    ctxP.fillStyle = "#db2777";
+    ctxP.beginPath(); ctxP.arc(MX, MY, 5, 0, Math.PI*2); ctxP.fill();
+    label(ctxP, "x(t)", PW - 50, pad + 10, "#db2777", 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 6: PENDULUM (linearized + optional exact integration)
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-pend");
+  const cp = document.getElementById("cv-pend-plot");
+  let ctx, ctxP;
+  const sL = document.getElementById("s-pend-L"), vL = document.getElementById("v-pend-L");
+  const sG = document.getElementById("s-pend-g"), vG = document.getElementById("v-pend-g");
+  const sTh = document.getElementById("s-pend-th"), vTh = document.getElementById("v-pend-th");
+  const btn = document.getElementById("b-pend-play");
+  const btnEx = document.getElementById("b-pend-exact");
+  const tEl = document.getElementById("pend-T"), fEl = document.getElementById("pend-f");
+  let showExact = false;
+
+  sL.addEventListener("input", () => vL.textContent = (+sL.value).toFixed(2));
+  sG.addEventListener("input", () => vG.textContent = (+sG.value).toFixed(2));
+  sTh.addEventListener("input", () => { vTh.textContent = (+sTh.value).toFixed(0); resetExact(); });
+  btn.addEventListener("click", () => { playing.pend = !playing.pend; btn.textContent = playing.pend ? "Pausa" : "Play"; });
+  btnEx.addEventListener("click", () => {
+    showExact = !showExact;
+    btnEx.textContent = showExact ? "Nascondi soluzione esatta" : "Confronta con soluzione esatta";
+    resetExact();
+  });
+
+  let phase = 0, lastT = now();
+  let exactTheta = 0, exactOmega = 0, exactInit = false;
+  function resetExact() {
+    exactTheta = (+sTh.value) * Math.PI/180;
+    exactOmega = 0;
+    exactInit = true;
+  }
+  resetExact();
+
+  function draw() {
+    const _c = fitCanvas(cv); const _p = fitCanvas(cp);
+    if (!_c || !_p) { lastT = now(); requestAnimationFrame(draw); return; }
+    ctx = _c; ctxP = _p;
+    const L = +sL.value, g = +sG.value, th0 = (+sTh.value) * Math.PI/180;
+    const w = Math.sqrt(g/L);
+    const Tper = 2*Math.PI/w;
+    tEl.textContent = Tper.toFixed(2);
+    fEl.textContent = (1/Tper).toFixed(2);
+
+    const t = now();
+    const dt = t - lastT;
+    if (playing.pend) {
+      phase += dt * w;
+      // integrate exact ODE: ddθ = -g/L sin θ (semi-implicit Euler, small steps)
+      if (showExact) {
+        const steps = 8;
+        const h = dt/steps;
+        for (let i = 0; i < steps; i++) {
+          exactOmega += -g/L * Math.sin(exactTheta) * h;
+          exactTheta += exactOmega * h;
+        }
+      }
+    }
+    lastT = t;
+
+    const theta = th0 * Math.cos(phase);
+
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+    const pivX = W/2, pivY = 40;
+    const scale = Math.min(H - 100, 280);
+    // ceiling
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(pivX - 50, pivY - 12, 100, 6);
+    for (let i = -45; i <= 45; i += 9) {
+      ctx.beginPath(); ctx.moveTo(pivX + i, pivY - 6); ctx.lineTo(pivX + i + 6, pivY - 12); ctx.stroke();
+    }
+    // dotted vertical
+    ctx.strokeStyle = "#cfd4dc"; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(pivX, pivY + scale + 30); ctx.stroke();
+    ctx.setLineDash([]);
+
+    function drawPend(th, color, alpha=1, dashed=false) {
+      const bx = pivX + scale*Math.sin(th);
+      const by = pivY + scale*Math.cos(th);
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color; ctx.lineWidth = 2;
+      if (dashed) ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(bx, by, 16, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // arc of motion
+    ctx.strokeStyle = "#e6e6e6";
+    ctx.beginPath();
+    ctx.arc(pivX, pivY, scale, Math.PI/2 - th0, Math.PI/2 + th0);
+    ctx.stroke();
+
+    // linearized pendulum (main)
+    drawPend(theta, "#db2777", 1);
+    // exact overlay
+    if (showExact) {
+      drawPend(exactTheta, "#0ea5e9", 0.85, true);
+    }
+
+    label(ctx, `L = ${L.toFixed(2)} m   g = ${g.toFixed(2)} m/s²   θ₀ = ${(+sTh.value).toFixed(0)}°`, 14, 22, "#64748b", 12);
+    label(ctx, `ω = √(g/L) = ${w.toFixed(2)} rad/s   T = 2π√(L/g) = ${Tper.toFixed(2)} s`, 14, 42, "#2563eb", 12);
+    if (showExact) {
+      label(ctx, "rosa: approssimazione armonica   azzurro: ODE non lineare", 14, H - 14, "#64748b", 11);
+    }
+
+    // plot θ(t)
+    const pRect = cp.getBoundingClientRect();
+    const PW = pRect.width, PH = pRect.height;
+    ctxP.clearRect(0, 0, PW, PH);
+    const pad = 22;
+    const mid = PH/2;
+    ctxP.strokeStyle = "#e6e6e6";
+    ctxP.beginPath();
+    ctxP.moveTo(pad, pad); ctxP.lineTo(pad, PH - pad);
+    ctxP.lineTo(PW - 8, PH - pad);
+    ctxP.stroke();
+    ctxP.strokeStyle = "#eee";
+    ctxP.beginPath(); ctxP.moveTo(pad, mid); ctxP.lineTo(PW - 8, mid); ctxP.stroke();
+    const tWin = 3 * Tper;
+    ctxP.strokeStyle = "#db2777"; ctxP.lineWidth = 2;
+    ctxP.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const tt = i/400 * tWin;
+      const thh = th0 * Math.cos(w*tt);
+      const X = pad + (tt/tWin) * (PW - pad - 8);
+      const Y = mid - (thh/th0) * (PH/2 - pad) * 0.85;
+      if (i === 0) ctxP.moveTo(X, Y); else ctxP.lineTo(X, Y);
+    }
+    ctxP.stroke();
+    const tNow = phase / w;
+    const tMark = ((tNow % tWin) + tWin) % tWin;
+    const MX = pad + (tMark/tWin) * (PW - pad - 8);
+    const MY = mid - (theta/th0) * (PH/2 - pad) * 0.85;
+    ctxP.fillStyle = "#db2777";
+    ctxP.beginPath(); ctxP.arc(MX, MY, 5, 0, Math.PI*2); ctxP.fill();
+    label(ctxP, "θ(t)  (approssimazione armonica)", PW - 240, pad + 10, "#db2777", 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  STEP 7: SUMMARY — three coupled illustrations
+// ============================================================
+(() => {
+  const cv = document.getElementById("cv-sum");
+  let ctx;
+  const sW = document.getElementById("s-sum-w"), vW = document.getElementById("v-sum-w");
+  sW.addEventListener("input", () => vW.textContent = (+sW.value).toFixed(2));
+  let phase = 0, lastT = now();
+
+  function springPath(ctx, x0, y, x1, coils=12, amp=8) {
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    const L = x1 - x0;
+    const N = 70;
+    for (let i = 1; i <= N; i++) {
+      const tt = i/N;
+      const xx = x0 + L*tt;
+      let yy = y;
+      if (tt > 0.06 && tt < 0.94) yy = y + Math.sin(tt * coils * Math.PI * 2) * amp;
+      ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+
+  function draw() {
+    const _c = fitCanvas(cv); if (!_c) { lastT = now(); requestAnimationFrame(draw); return; } ctx = _c;
+    const rect = cv.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+    const w = +sW.value;
+    const t = now();
+    if (playing.sum) phase += (t - lastT) * w;
+    lastT = t;
+    const A = 1;
+    const x = A * Math.cos(phase);
+
+    const rowH = H / 3;
+    // Row 1: circle + projection
+    {
+      const cy = rowH/2 + 6;
+      const cx = 90;
+      const sc = 48;
+      ctx.strokeStyle = "#cfd4dc";
+      ctx.beginPath(); ctx.arc(cx, cy, A*sc, 0, Math.PI*2); ctx.stroke();
+      ctx.strokeStyle = "#fbb6ce"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(cx - A*sc, cy); ctx.lineTo(cx + A*sc, cy); ctx.stroke();
+      ctx.lineWidth = 1;
+      const px = cx + A*sc*Math.cos(phase);
+      const py = cy - A*sc*Math.sin(phase);
+      ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, cy); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#2563eb"; ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI*2); ctx.fill();
+      // long track
+      const tx0 = cx + A*sc + 30, txL = W - tx0 - 30, tcy = cy;
+      ctx.strokeStyle = "#e6e6e6";
+      ctx.beginPath(); ctx.moveTo(tx0, tcy); ctx.lineTo(tx0 + txL, tcy); ctx.stroke();
+      const mx = tx0 + txL/2 + x * (txL/2 * 0.85);
+      ctx.fillStyle = "#2563eb";
+      ctx.beginPath(); ctx.arc(mx, tcy, 8, 0, Math.PI*2); ctx.fill();
+      label(ctx, "proiezione MCU", 14, 18, "#2563eb", 12);
+    }
+    // Row 2: spring
+    {
+      const yC = rowH + rowH/2;
+      const wallX = 60;
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(wallX - 16, yC - 40, 6, 80);
+      const eqX = wallX + 250;
+      ctx.strokeStyle = "#cbd5e1"; ctx.setLineDash([3,4]);
+      ctx.beginPath(); ctx.moveTo(eqX, yC - 30); ctx.lineTo(eqX, yC + 30); ctx.stroke();
+      ctx.setLineDash([]);
+      const scale = 100;
+      const mx2 = eqX + x*scale;
+      ctx.strokeStyle = "#db2777"; ctx.lineWidth = 2;
+      springPath(ctx, wallX - 10, yC, mx2 - 22, 13, 8);
+      ctx.fillStyle = "#db2777";
+      ctx.fillRect(mx2 - 22, yC - 22, 44, 44);
+      label(ctx, "m", mx2 - 5, yC + 4, "white", 13);
+      label(ctx, "molla   F = −kx", 14, rowH + 18, "#db2777", 12);
+    }
+    // Row 3: pendulum
+    {
+      const pivY = 2*rowH + 20;
+      const pivX = W/2;
+      const L = 110;
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(pivX - 30, pivY - 6, 60, 4);
+      ctx.strokeStyle = "#cfd4dc"; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(pivX, pivY + L + 24); ctx.stroke();
+      ctx.setLineDash([]);
+      const th0 = 0.35;
+      const theta = th0 * Math.cos(phase);
+      const bx = pivX + L*Math.sin(theta);
+      const by = pivY + L*Math.cos(theta);
+      ctx.strokeStyle = "#d97706"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.fillStyle = "#d97706";
+      ctx.beginPath(); ctx.arc(bx, by, 12, 0, Math.PI*2); ctx.fill();
+      label(ctx, "pendolo (piccoli angoli)   F ≈ −mg θ", 14, 2*rowH + 18, "#d97706", 12);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+//  QUIZZES — 10 teoria + 10 calcolo per sezione
+// ============================================================
+const QUIZZES = {
+  1: {
+    teoria: [
+      { q: "Cosa significa che il moto è <em>uniforme</em>?", opts: ["Il vettore velocità è costante","Il modulo della velocità è costante","L'accelerazione è nulla","La traiettoria è una retta"], correct: 1, exp: "Uniforme = $|\\vec v|$ costante. La direzione di $\\vec v$ cambia di continuo." },
+      { q: "In che direzione punta l'accelerazione in un MCU?", opts: ["Tangente alla traiettoria","Verso il centro","In avanti, lungo $\\vec v$","Verso l'esterno"], correct: 1, exp: "È centripeta: $\\vec a=-\\omega^2\\vec r$, sempre verso il centro $O$." },
+      { q: "La velocità in un MCU...", opts: ["ha modulo e direzione costanti","ha modulo costante e direzione variabile","ha modulo variabile e direzione costante","è sempre nulla"], correct: 1, exp: "Modulo costante (uniforme), direzione sempre tangente e quindi variabile." },
+      { q: "Il periodo $T$ è...", opts: ["il numero di giri al secondo","il tempo per compiere un giro completo","l'angolo percorso in 1 s","la lunghezza della circonferenza"], correct: 1, exp: "$T$ è il tempo di un giro completo; $f=1/T$ è il numero di giri al secondo." },
+      { q: "La frequenza $f$ rappresenta...", opts: ["il tempo di un giro","il numero di giri al secondo","la velocità tangenziale","l'accelerazione"], correct: 1, exp: "$f$ si misura in hertz (Hz) = giri al secondo, e $f=1/T$." },
+      { q: "Quale relazione lega $T$ e $f$?", opts: ["$T=f$","$T=2\\pi f$","$T=1/f$","$T=f^2$"], correct: 2, exp: "$f=1/T$, quindi $T=1/f$." },
+      { q: "In quali unità si misura la velocità angolare $\\omega$?", opts: ["m/s","rad/s","Hz","rad"], correct: 1, exp: "$\\omega$ è un angolo diviso un tempo: radianti al secondo." },
+      { q: "In un MCU la velocità angolare $\\omega$...", opts: ["aumenta nel tempo","è costante","oscilla","è nulla"], correct: 1, exp: "Per definizione di moto uniforme $\\omega$ è costante: $\\theta(t)=\\omega t+\\varphi_0$." },
+      { q: "Perché c'è accelerazione anche se $|\\vec v|$ è costante?", opts: ["Perché aumenta la velocità","Perché cambia la direzione di $\\vec v$","Perché cambia la massa","Non c'è accelerazione"], correct: 1, exp: "L'accelerazione misura la variazione del <em>vettore</em> $\\vec v$: qui cambia la direzione." },
+      { q: "Da cosa dipende il modulo dell'accelerazione centripeta?", opts: ["Solo da $r$","Da $\\omega$ e $r$","Solo dalla massa","Da nulla, è una costante"], correct: 1, exp: "$a_c=\\omega^2 r=v^2/r$: dipende da raggio e velocità." }
+    ],
+    calcolo: [
+      { q: "Una ruota compie 120 giri al minuto. Quanto vale $\\omega$?", opts: ["$2\\pi$ rad/s","$4\\pi$ rad/s","$120$ rad/s","$60$ rad/s"], correct: 1, exp: "$f=120/60=2$ Hz, $\\omega=2\\pi f=4\\pi\\approx12{,}57$ rad/s." },
+      { q: "Se $\\omega=\\pi$ rad/s, quanto vale $T$?", opts: ["$1/\\pi$ s","$2$ s","$\\pi$ s","$1/2$ s"], correct: 1, exp: "$T=2\\pi/\\omega=2\\pi/\\pi=2$ s." },
+      { q: "Con $r=2$ m e $\\omega=3$ rad/s, l'accelerazione centripeta è:", opts: ["$6$ m/s²","$12$ m/s²","$18$ m/s²","$9$ m/s²"], correct: 2, exp: "$a_c=\\omega^2 r=9\\cdot2=18$ m/s²." },
+      { q: "Con $r=0{,}5$ m e $T=4$ s, la velocità tangenziale è:", opts: ["$\\approx0{,}79$ m/s","$2$ m/s","$\\approx0{,}25$ m/s","$8$ m/s"], correct: 0, exp: "$v=\\omega r=(2\\pi/T)r=(\\pi/2)\\cdot0{,}5=\\pi/4\\approx0{,}785$ m/s." },
+      { q: "Se il periodo è $T=0{,}5$ s, la frequenza è:", opts: ["$0{,}5$ Hz","$1$ Hz","$2$ Hz","$5$ Hz"], correct: 2, exp: "$f=1/T=1/0{,}5=2$ Hz." },
+      { q: "Se $\\omega=2$ rad/s, il periodo è:", opts: ["$\\pi$ s","$2\\pi$ s","$1$ s","$4$ s"], correct: 0, exp: "$T=2\\pi/\\omega=2\\pi/2=\\pi\\approx3{,}14$ s." },
+      { q: "Con $f=50$ Hz, quanto vale $\\omega$?", opts: ["$50$ rad/s","$100$ rad/s","$100\\pi$ rad/s","$\\pi/50$ rad/s"], correct: 2, exp: "$\\omega=2\\pi f=2\\pi\\cdot50=100\\pi\\approx314$ rad/s." },
+      { q: "Un punto su $r=1$ m ha $v=4$ m/s. Quanto vale $\\omega$?", opts: ["$2$ rad/s","$4$ rad/s","$8$ rad/s","$0{,}25$ rad/s"], correct: 1, exp: "$\\omega=v/r=4/1=4$ rad/s." },
+      { q: "Con $r=3$ m e $\\omega=2$ rad/s, la velocità tangenziale è:", opts: ["$1{,}5$ m/s","$5$ m/s","$6$ m/s","$12$ m/s"], correct: 2, exp: "$v=\\omega r=2\\cdot3=6$ m/s." },
+      { q: "Con $v=10$ m/s e $r=5$ m, l'accelerazione centripeta è:", opts: ["$2$ m/s²","$20$ m/s²","$50$ m/s²","$100$ m/s²"], correct: 1, exp: "$a_c=v^2/r=100/5=20$ m/s²." }
+    ]
+  },
+  2: {
+    teoria: [
+      { q: "Perché $\\vec v$ è perpendicolare a $\\vec r$?", opts: ["Per la forma del cerchio","Perché $|\\vec r|$ è costante e la derivata di un vettore di modulo costante è ortogonale a esso","Perché $\\vec a$ è centripeta","Solo all'istante iniziale"], correct: 1, exp: "Da $|\\vec r|^2=$ cost, derivando: $2\\vec r\\cdot\\vec v=0$." },
+      { q: "Perché $\\vec a$ punta verso il centro?", opts: ["Perché $|\\vec v|$ cresce verso il centro","Perché $\\vec a$ è ortogonale a $\\vec v$ ed è diretta verso l'interno","Per pura convenzione","Perché c'è attrito"], correct: 1, exp: "$|\\vec v|$ costante → $\\vec v\\cdot\\vec a=0$; $\\vec a=-\\omega^2\\vec r$ è centripeta." },
+      { q: "Come si esprime $\\vec a$ in funzione di $\\vec r$?", opts: ["$\\vec a=\\omega\\vec r$","$\\vec a=-\\omega^2\\vec r$","$\\vec a=\\omega^2\\vec r$","$\\vec a=-\\omega\\vec r$"], correct: 1, exp: "$\\vec a=-\\omega^2\\vec r$: stessa direzione di $\\vec r$, verso opposto." },
+      { q: "Quanto vale il prodotto scalare $\\vec v\\cdot\\vec r$?", opts: ["$\\omega r^2$","$0$","$v\\,r$","$-\\omega^2 r$"], correct: 1, exp: "Sono perpendicolari, quindi il prodotto scalare è nullo." },
+      { q: "In un MCU il modulo di $\\vec a$...", opts: ["è costante","oscilla","cresce nel tempo","è nullo"], correct: 0, exp: "$|\\vec a|=\\omega^2 r$ con $\\omega$ e $r$ costanti: modulo costante, direzione rotante." },
+      { q: "Rispetto alla traiettoria, la velocità è sempre:", opts: ["radiale","tangente","perpendicolare alla tangente","nulla"], correct: 1, exp: "La velocità è sempre tangente alla circonferenza." },
+      { q: "Se $\\omega$ raddoppia (a $r$ fisso), $|\\vec a|$:", opts: ["raddoppia","quadruplica","si dimezza","resta uguale"], correct: 1, exp: "$a=\\omega^2 r$: $a\\propto\\omega^2$, quindi ×4." },
+      { q: "Se $\\omega$ raddoppia (a $r$ fisso), $|\\vec v|$:", opts: ["raddoppia","quadruplica","si dimezza","resta uguale"], correct: 0, exp: "$v=\\omega r$: $v\\propto\\omega$, quindi ×2." },
+      { q: "I vettori $\\vec a$ e $\\vec r$ sono:", opts: ["paralleli e concordi","antiparalleli","perpendicolari","sfasati di 45°"], correct: 1, exp: "$\\vec a=-\\omega^2\\vec r$: stessa retta d'azione, versi opposti." },
+      { q: "Quanto vale $\\vec v\\cdot\\vec a$ in un MCU?", opts: ["$0$","$\\omega^3 r^2$","$v\\,a$","$-\\omega^2$"], correct: 0, exp: "$\\vec v$ è tangente, $\\vec a$ è radiale: sono perpendicolari, prodotto scalare nullo." }
+    ],
+    calcolo: [
+      { q: "Con $\\omega=2$ rad/s e $r=0{,}5$ m, $|\\vec a|$ vale:", opts: ["$1$ m/s²","$2$ m/s²","$0{,}5$ m/s²","$4$ m/s²"], correct: 1, exp: "$|\\vec a|=\\omega^2 r=4\\cdot0{,}5=2$ m/s²." },
+      { q: "Quanto vale il rapporto $|\\vec a|/|\\vec v|$?", opts: ["$\\omega^2$","$\\omega$","$r$","$1/\\omega$"], correct: 1, exp: "$|\\vec a|/|\\vec v|=\\omega^2 r/(\\omega r)=\\omega$." },
+      { q: "Con $v=10$ m/s e $r=2$ m, $|\\vec a|$:", opts: ["$5$ m/s²","$20$ m/s²","$50$ m/s²","$100$ m/s²"], correct: 2, exp: "$|\\vec a|=v^2/r=100/2=50$ m/s²." },
+      { q: "Con $\\omega=3$ rad/s e $r=2$ m, $|\\vec v|$:", opts: ["$1{,}5$ m/s","$5$ m/s","$6$ m/s","$18$ m/s"], correct: 2, exp: "$|\\vec v|=\\omega r=3\\cdot2=6$ m/s." },
+      { q: "Con $\\omega=3$ rad/s e $r=2$ m, $|\\vec a|$:", opts: ["$6$ m/s²","$12$ m/s²","$18$ m/s²","$36$ m/s²"], correct: 2, exp: "$|\\vec a|=\\omega^2 r=9\\cdot2=18$ m/s²." },
+      { q: "Se $|\\vec v|=8$ m/s e $|\\vec a|=16$ m/s², quanto vale $\\omega$?", opts: ["$0{,}5$ rad/s","$2$ rad/s","$4$ rad/s","$8$ rad/s"], correct: 1, exp: "$\\omega=|\\vec a|/|\\vec v|=16/8=2$ rad/s." },
+      { q: "Con $r=4$ m e $\\omega=0{,}5$ rad/s, $|\\vec a|$:", opts: ["$0{,}5$ m/s²","$1$ m/s²","$2$ m/s²","$4$ m/s²"], correct: 1, exp: "$|\\vec a|=\\omega^2 r=0{,}25\\cdot4=1$ m/s²." },
+      { q: "Se $|\\vec v|=6$ m/s e $|\\vec a|=12$ m/s², il raggio è:", opts: ["$2$ m","$3$ m","$0{,}5$ m","$72$ m"], correct: 1, exp: "$r=v^2/a=36/12=3$ m." },
+      { q: "Con $\\omega=10$ rad/s e $r=0{,}1$ m, $|\\vec v|$:", opts: ["$0{,}1$ m/s","$1$ m/s","$10$ m/s","$100$ m/s"], correct: 1, exp: "$|\\vec v|=\\omega r=10\\cdot0{,}1=1$ m/s." },
+      { q: "Con $r=2$ m e $T=\\pi$ s, $|\\vec v|$:", opts: ["$2$ m/s","$4$ m/s","$\\pi$ m/s","$1$ m/s"], correct: 1, exp: "$\\omega=2\\pi/T=2$ rad/s; $|\\vec v|=\\omega r=4$ m/s." }
+    ]
+  },
+  3: {
+    teoria: [
+      { q: "Il moto armonico semplice si ottiene come:", opts: ["la proiezione di un MCU su un suo diametro","la proiezione di un MCU sul centro","un moto a velocità costante","un moto a accelerazione costante"], correct: 0, exp: "L'ombra di un punto in MCU su un diametro descrive un MAS." },
+      { q: "Nell'equazione $x(t)=A\\cos(\\omega t+\\varphi_0)$, l'ampiezza $A$ è:", opts: ["la pulsazione","il raggio del cerchio sorgente","il periodo","la fase iniziale"], correct: 1, exp: "$A=r$: la proiezione arriva fino agli estremi del diametro." },
+      { q: "L'equazione oraria del MAS è:", opts: ["$x(t)=A\\omega t$","$x(t)=A\\cos(\\omega t+\\varphi_0)$","$x(t)=At^2$","$x(t)=A\\,e^{\\omega t}$"], correct: 1, exp: "È una funzione sinusoidale del tempo." },
+      { q: "La velocità $v_x$ del MAS si ottiene:", opts: ["proiettando $\\vec v$ sul diametro","proiettando $\\vec r$ sul diametro","derivando due volte $x$","è sempre nulla"], correct: 0, exp: "$v_x$ è la componente di $\\vec v$ lungo il diametro." },
+      { q: "L'accelerazione $a_x$ del MAS si ottiene:", opts: ["proiettando $\\vec a$ sul diametro","proiettando $\\vec v$ sul diametro","è costante","è sempre nulla"], correct: 0, exp: "$a_x$ è la componente di $\\vec a$ lungo il diametro." },
+      { q: "Quale relazione lega $a_x$ e $x$?", opts: ["$a_x=\\omega x$","$a_x=-\\omega^2 x$","$a_x=\\omega^2 x$","$a_x=-x$"], correct: 1, exp: "$a_x=-\\omega^2 x$: la firma del moto armonico." },
+      { q: "Cambiare solo la fase $\\varphi_0$:", opts: ["cambia il periodo","cambia l'ampiezza","trasla il moto nel tempo","rende il moto non armonico"], correct: 2, exp: "$\\varphi_0$ è una traslazione temporale dell'oscillazione." },
+      { q: "Quando $x$ è massimo (estremo), la velocità $v_x$ è:", opts: ["massima","nulla","negativa","uguale a $x$"], correct: 1, exp: "Agli estremi il punto inverte il moto: $v_x=0$, mentre $|a_x|$ è massima." },
+      { q: "Quando $x=0$ (centro), il modulo di $v_x$ è:", opts: ["nullo","massimo","uguale ad $A$","negativo"], correct: 1, exp: "Al passaggio per il centro la velocità è massima e l'accelerazione nulla." },
+      { q: "Il periodo della proiezione rispetto a quello del MCU è:", opts: ["la metà","il doppio","lo stesso","il quadruplo"], correct: 2, exp: "La proiezione completa un'oscillazione ogni giro: stesso $T$." }
+    ],
+    calcolo: [
+      { q: "Per $x(t)=3\\cos(2t)$, quanto vale $x(0)$?", opts: ["$0$","$3$","$-3$","$2$"], correct: 1, exp: "$x(0)=3\\cos0=3$." },
+      { q: "Per $x(t)=3\\cos(2t)$, quanto vale $x$ in $t=\\pi/4$?", opts: ["$3$","$0$","$-3$","$1{,}5$"], correct: 1, exp: "$x(\\pi/4)=3\\cos(\\pi/2)=0$." },
+      { q: "Periodo di $x(t)=A\\cos(5t)$:", opts: ["$5$ s","$2\\pi$ s","$\\approx1{,}26$ s","$\\pi$ s"], correct: 2, exp: "$T=2\\pi/\\omega=2\\pi/5\\approx1{,}257$ s." },
+      { q: "Per $x(t)=2\\cos(3t)$, quanto vale la velocità $v_x(0)$?", opts: ["$6$","$0$","$-6$","$2$"], correct: 1, exp: "$v_x=-6\\sin(3t)$; in $t=0$ vale $0$." },
+      { q: "Per un MAS con $A=4$ m e $\\omega=2$ rad/s, la velocità massima è:", opts: ["$2$ m/s","$4$ m/s","$8$ m/s","$16$ m/s"], correct: 2, exp: "$v_\\max=A\\omega=4\\cdot2=8$ m/s." },
+      { q: "Per $A=4$ m e $\\omega=2$ rad/s, l'accelerazione massima è:", opts: ["$8$ m/s²","$16$ m/s²","$4$ m/s²","$32$ m/s²"], correct: 1, exp: "$a_\\max=A\\omega^2=4\\cdot4=16$ m/s²." },
+      { q: "Periodo di $x(t)=0{,}5\\cos(\\pi t)$:", opts: ["$0{,}5$ s","$1$ s","$2$ s","$\\pi$ s"], correct: 2, exp: "$T=2\\pi/\\omega=2\\pi/\\pi=2$ s." },
+      { q: "Per $A=2$ m e $\\omega=\\pi$ rad/s, la velocità massima è:", opts: ["$2$ m/s","$\\pi$ m/s","$2\\pi$ m/s","$\\pi^2$ m/s"], correct: 2, exp: "$v_\\max=A\\omega=2\\pi\\approx6{,}28$ m/s." },
+      { q: "Per $x(t)=\\cos(\\omega t)$, $x$ si annulla per la prima volta quando:", opts: ["$\\omega t=0$","$\\omega t=\\pi/2$","$\\omega t=\\pi$","$\\omega t=2\\pi$"], correct: 1, exp: "$\\cos(\\pi/2)=0$." },
+      { q: "Per $A=3$ m e $\\omega=4$ rad/s, l'accelerazione massima è:", opts: ["$12$ m/s²","$24$ m/s²","$48$ m/s²","$36$ m/s²"], correct: 2, exp: "$a_\\max=A\\omega^2=3\\cdot16=48$ m/s²." }
+    ]
+  },
+  4: {
+    teoria: [
+      { q: "Quale equazione caratterizza il MAS?", opts: ["$\\ddot x=\\omega x$","$\\ddot x=-\\omega^2 x$","$\\dot x=-\\omega x$","$\\ddot x=-\\omega^2 x^2$"], correct: 1, exp: "$\\ddot x=-\\omega^2 x$: accelerazione proporzionale e opposta allo spostamento." },
+      { q: "Una forza di richiamo lineare ha la forma:", opts: ["$F=kx$","$F=-kx$","$F=-kx^2$","$F=k$"], correct: 1, exp: "$F=-kx$ con $k>0$: rivolta verso l'equilibrio, proporzionale allo spostamento." },
+      { q: "Per $x(t)=A\\cos(\\omega t)$, la velocità iniziale $v(0)$ è:", opts: ["$A\\omega$","$0$","$-A\\omega$","$A$"], correct: 1, exp: "$v(t)=-A\\omega\\sin(\\omega t)$, e $\\sin0=0$." },
+      { q: "Per $x(t)=A\\cos(\\omega t)$, l'accelerazione iniziale $a(0)$ è:", opts: ["$0$","$-A\\omega$","$-A\\omega^2$","$A\\omega^2$"], correct: 2, exp: "$a(t)=-A\\omega^2\\cos(\\omega t)$, in $t=0$ vale $-A\\omega^2$." },
+      { q: "L'isocronismo del MAS significa che:", opts: ["il periodo dipende dall'ampiezza","il periodo non dipende dall'ampiezza","la velocità è costante","l'ampiezza diminuisce"], correct: 1, exp: "$T=2\\pi/\\omega$ non contiene $A$." },
+      { q: "Quando lo spostamento è massimo, l'accelerazione (in modulo) è:", opts: ["nulla","massima","metà del massimo","negativa"], correct: 1, exp: "$|a|=\\omega^2|x|$: massima dove $|x|$ è massimo." },
+      { q: "Quando $x=0$, la velocità è:", opts: ["nulla","massima","negativa","infinita"], correct: 1, exp: "Al centro l'energia è tutta cinetica: velocità massima." },
+      { q: "Dalla legge di Newton, la forza nel MAS è:", opts: ["$F=m\\omega x$","$F=-m\\omega^2 x$","$F=m\\omega^2 x$","$F=-m\\omega x$"], correct: 1, exp: "$F=ma=m(-\\omega^2 x)=-m\\omega^2 x$." },
+      { q: "La pulsazione di un oscillatore con costante $k$ e massa $m$ è:", opts: ["$\\omega=k/m$","$\\omega=\\sqrt{k/m}$","$\\omega=\\sqrt{m/k}$","$\\omega=km$"], correct: 1, exp: "Da $F=-kx=-m\\omega^2 x$ segue $\\omega=\\sqrt{k/m}$." },
+      { q: "Durante un'oscillazione armonica, l'energia meccanica totale:", opts: ["aumenta","diminuisce","si conserva","oscilla con periodo $T$"], correct: 2, exp: "In assenza di attrito energia cinetica e potenziale si scambiano, ma la somma è costante." }
+    ],
+    calcolo: [
+      { q: "Se $\\omega=10$ rad/s e $m=2$ kg, la costante elastica equivalente $k$ è:", opts: ["$20$ N/m","$100$ N/m","$200$ N/m","$5$ N/m"], correct: 2, exp: "$k=m\\omega^2=2\\cdot100=200$ N/m." },
+      { q: "Con $k=8$ N/m e $m=2$ kg, la pulsazione $\\omega$ è:", opts: ["$2$ rad/s","$4$ rad/s","$16$ rad/s","$0{,}5$ rad/s"], correct: 0, exp: "$\\omega=\\sqrt{k/m}=\\sqrt{8/2}=\\sqrt4=2$ rad/s." },
+      { q: "Per $A=1$ m e $\\omega=3$ rad/s, la velocità massima è:", opts: ["$1$ m/s","$3$ m/s","$9$ m/s","$6$ m/s"], correct: 1, exp: "$v_\\max=A\\omega=3$ m/s." },
+      { q: "Per $A=1$ m e $\\omega=3$ rad/s, l'accelerazione massima è:", opts: ["$3$ m/s²","$6$ m/s²","$9$ m/s²","$1$ m/s²"], correct: 2, exp: "$a_\\max=A\\omega^2=9$ m/s²." },
+      { q: "Per $x(t)=A\\cos(\\omega t)$, la velocità massima vale:", opts: ["$A$","$A\\omega$","$A\\omega^2$","$\\omega$"], correct: 1, exp: "$v=-A\\omega\\sin(\\omega t)$ → $v_\\max=A\\omega$." },
+      { q: "Con $m=0{,}5$ kg e $k=8$ N/m, la pulsazione è:", opts: ["$2$ rad/s","$4$ rad/s","$16$ rad/s","$0{,}25$ rad/s"], correct: 1, exp: "$\\omega=\\sqrt{k/m}=\\sqrt{8/0{,}5}=\\sqrt{16}=4$ rad/s." },
+      { q: "Con $\\omega=5$ rad/s e $m=4$ kg, la costante $k$ è:", opts: ["$20$ N/m","$100$ N/m","$25$ N/m","$9$ N/m"], correct: 1, exp: "$k=m\\omega^2=4\\cdot25=100$ N/m." },
+      { q: "Per $A=2$ m e $\\omega=2$ rad/s, l'accelerazione massima è:", opts: ["$4$ m/s²","$8$ m/s²","$16$ m/s²","$2$ m/s²"], correct: 1, exp: "$a_\\max=A\\omega^2=2\\cdot4=8$ m/s²." },
+      { q: "Se $\\omega=4$ rad/s, il periodo è:", opts: ["$\\pi/2$ s","$\\pi$ s","$2\\pi$ s","$8$ s"], correct: 0, exp: "$T=2\\pi/\\omega=2\\pi/4=\\pi/2\\approx1{,}57$ s." },
+      { q: "Con $k=18$ N/m e $m=2$ kg, la pulsazione è:", opts: ["$3$ rad/s","$9$ rad/s","$36$ rad/s","$6$ rad/s"], correct: 0, exp: "$\\omega=\\sqrt{k/m}=\\sqrt{9}=3$ rad/s." }
+    ]
+  },
+  5: {
+    teoria: [
+      { q: "La legge di Hooke per una molla ideale è:", opts: ["$F=kx$","$F=-kx$","$F=-kx^2$","$F=mg$"], correct: 1, exp: "La forza elastica è proporzionale e opposta all'allungamento." },
+      { q: "Il periodo di una massa su molla è:", opts: ["$2\\pi\\sqrt{k/m}$","$2\\pi\\sqrt{m/k}$","$2\\pi\\,mk$","$2\\pi/k$"], correct: 1, exp: "$T=2\\pi\\sqrt{m/k}$." },
+      { q: "Il periodo della molla dipende dall'ampiezza?", opts: ["sì, cresce con $A$","sì, decresce con $A$","no, è indipendente","solo per piccole $A$"], correct: 2, exp: "L'oscillatore armonico è isocrono: $T$ non contiene $A$." },
+      { q: "Una molla più rigida (k maggiore) produce oscillazioni:", opts: ["più lente","più veloci","di uguale periodo","che si smorzano"], correct: 1, exp: "$T\\propto1/\\sqrt k$: più $k$, meno $T$, oscillazioni più rapide." },
+      { q: "Aumentando la massa (a $k$ fisso) le oscillazioni diventano:", opts: ["più rapide","più lente","invariate","instabili"], correct: 1, exp: "$T\\propto\\sqrt m$: più massa, più periodo." },
+      { q: "Il segno meno in $F=-kx$ indica che la forza:", opts: ["è sempre positiva","si oppone allo spostamento dall'equilibrio","è costante","dipende dalla velocità"], correct: 1, exp: "La forza punta sempre verso $x=0$." },
+      { q: "Per la molla, $\\omega^2$ vale:", opts: ["$k/m$","$m/k$","$kg$","$g/L$"], correct: 0, exp: "Da $m\\ddot x=-kx$ segue $\\ddot x=-(k/m)x$, quindi $\\omega^2=k/m$." },
+      { q: "Per una molla orizzontale, nel punto di equilibrio la forza elastica è:", opts: ["massima","nulla","uguale al peso","diretta verso l'alto"], correct: 1, exp: "Nell'equilibrio $x=0$, quindi $F=-kx=0$." },
+      { q: "L'energia potenziale elastica di una molla vale:", opts: ["$kx$","$\\tfrac12 kx^2$","$\\tfrac12 kx$","$kx^2$"], correct: 1, exp: "$U=\\tfrac12 kx^2$." },
+      { q: "La velocità della massa è massima:", opts: ["agli estremi","al passaggio per l'equilibrio","a molla massimamente compressa","mai"], correct: 1, exp: "Nel punto di equilibrio l'energia è tutta cinetica." }
+    ],
+    calcolo: [
+      { q: "Massa $m=2$ kg, $k=8$ N/m. Periodo?", opts: ["$\\pi/2$ s","$\\pi$ s","$2\\pi$ s","$4$ s"], correct: 1, exp: "$T=2\\pi\\sqrt{m/k}=2\\pi\\sqrt{2/8}=2\\pi\\cdot\\tfrac12=\\pi$ s." },
+      { q: "Stessa molla, la massa raddoppia. Nuovo periodo:", opts: ["$T/\\sqrt2$","$T\\sqrt2$","$2T$","invariato"], correct: 1, exp: "$T\\propto\\sqrt m$: ×$\\sqrt2\\approx1{,}41$." },
+      { q: "Stessa massa, $k$ quadruplica. Nuovo periodo:", opts: ["$T/2$","$T/4$","$2T$","invariato"], correct: 0, exp: "$T\\propto1/\\sqrt k$: $k\\to4k$ dà $T\\to T/2$." },
+      { q: "Con $m=0{,}5$ kg e $T=1$ s, la costante $k$ è:", opts: ["$\\approx19{,}7$ N/m","$\\approx9{,}9$ N/m","$2\\pi$ N/m","$\\pi$ N/m"], correct: 0, exp: "$k=4\\pi^2 m/T^2=4\\pi^2\\cdot0{,}5\\approx19{,}74$ N/m." },
+      { q: "Con $k=10$ N/m e $m=2{,}5$ kg, $\\omega$ vale:", opts: ["$2$ rad/s","$4$ rad/s","$25$ rad/s","$0{,}25$ rad/s"], correct: 0, exp: "$\\omega=\\sqrt{k/m}=\\sqrt{10/2{,}5}=\\sqrt4=2$ rad/s." },
+      { q: "Con $k=100$ N/m e $m=1$ kg, il periodo è:", opts: ["$\\approx0{,}63$ s","$\\approx6{,}3$ s","$10$ s","$\\pi$ s"], correct: 0, exp: "$\\omega=\\sqrt{100}=10$; $T=2\\pi/10\\approx0{,}628$ s." },
+      { q: "Con $m=4$ kg e $k=16$ N/m, $\\omega$ vale:", opts: ["$1$ rad/s","$2$ rad/s","$4$ rad/s","$0{,}5$ rad/s"], correct: 1, exp: "$\\omega=\\sqrt{16/4}=\\sqrt4=2$ rad/s." },
+      { q: "Con $k=200$ N/m e $m=2$ kg, $\\omega$ vale:", opts: ["$10$ rad/s","$100$ rad/s","$20$ rad/s","$1$ rad/s"], correct: 0, exp: "$\\omega=\\sqrt{200/2}=\\sqrt{100}=10$ rad/s." },
+      { q: "Con $m=1$ kg e $k=4$ N/m, il periodo è:", opts: ["$\\pi/2$ s","$\\pi$ s","$2\\pi$ s","$4$ s"], correct: 1, exp: "$\\omega=\\sqrt4=2$; $T=2\\pi/2=\\pi$ s." },
+      { q: "Con $k=50$ N/m e $m=2$ kg, il periodo è:", opts: ["$\\approx1{,}26$ s","$5$ s","$\\approx0{,}8$ s","$2\\pi$ s"], correct: 0, exp: "$\\omega=\\sqrt{50/2}=5$; $T=2\\pi/5\\approx1{,}257$ s." }
+    ]
+  },
+  6: {
+    teoria: [
+      { q: "Il periodo di un pendolo semplice (piccoli angoli) è:", opts: ["$2\\pi\\sqrt{g/L}$","$2\\pi\\sqrt{L/g}$","$2\\pi\\sqrt{m/L}$","$2\\pi L/g$"], correct: 1, exp: "$T=2\\pi\\sqrt{L/g}$." },
+      { q: "Il periodo del pendolo dipende dalla massa?", opts: ["sì, cresce con $m$","sì, decresce con $m$","no","solo per masse grandi"], correct: 2, exp: "La massa si semplifica: $T$ non dipende da $m$." },
+      { q: "Da quali grandezze dipende $T$ del pendolo?", opts: ["$L$ e $g$","$L$ e $m$","$m$ e $g$","solo $L$"], correct: 0, exp: "$T=2\\pi\\sqrt{L/g}$: solo lunghezza e gravità." },
+      { q: "L'approssimazione dei piccoli angoli consiste in:", opts: ["$\\cos\\theta\\approx1$","$\\sin\\theta\\approx\\theta$","$\\tan\\theta\\approx0$","$\\theta\\approx0$ sempre"], correct: 1, exp: "Per $\\theta$ piccolo (in radianti) $\\sin\\theta\\approx\\theta$." },
+      { q: "Il pendolo è un oscillatore armonico:", opts: ["sempre","solo per piccole oscillazioni","solo per grandi oscillazioni","mai"], correct: 1, exp: "Solo con $\\sin\\theta\\approx\\theta$ l'equazione diventa quella del MAS." },
+      { q: "La forza di richiamo del pendolo è:", opts: ["la tensione del filo","la componente tangenziale del peso","la forza elastica","l'attrito"], correct: 1, exp: "$F_t=-mg\\sin\\theta$: la componente del peso lungo la traiettoria." },
+      { q: "Aumentando l'ampiezza a grandi angoli, il periodo reale:", opts: ["resta uguale","aumenta","diminuisce","si annulla"], correct: 1, exp: "Oltre l'approssimazione lineare il periodo cresce con l'ampiezza." },
+      { q: "Su un pianeta con $g$ minore, il periodo del pendolo:", opts: ["aumenta","diminuisce","resta uguale","si annulla"], correct: 0, exp: "$T\\propto1/\\sqrt g$: meno gravità, più periodo." },
+      { q: "Un pendolo più lungo ha un periodo:", opts: ["minore","maggiore","uguale","nullo"], correct: 1, exp: "$T\\propto\\sqrt L$." },
+      { q: "L'isocronismo di Galileo afferma che (piccole oscillazioni):", opts: ["il periodo dipende dall'ampiezza","il periodo è indipendente dall'ampiezza","il periodo dipende dalla massa","il pendolo non oscilla"], correct: 1, exp: "Per piccole oscillazioni il periodo non dipende dall'ampiezza." }
+    ],
+    calcolo: [
+      { q: "Pendolo con $L=1$ m e $g=9{,}81$ m/s². Periodo?", opts: ["$\\approx1{,}00$ s","$\\approx2{,}01$ s","$\\approx3{,}14$ s","$\\approx0{,}50$ s"], correct: 1, exp: "$T=2\\pi\\sqrt{1/9{,}81}\\approx2{,}006$ s." },
+      { q: "Per avere $T=2$ s ($g=9{,}81$), serve $L\\approx$", opts: ["$0{,}99$ m","$2$ m","$0{,}5$ m","$4$ m"], correct: 0, exp: "$L=g(T/2\\pi)^2=9{,}81/\\pi^2\\approx0{,}994$ m." },
+      { q: "Se $L$ raddoppia, il nuovo periodo è:", opts: ["$2T$","$T\\sqrt2$","$T/2$","$T/\\sqrt2$"], correct: 1, exp: "$T\\propto\\sqrt L$: ×$\\sqrt2$." },
+      { q: "Sulla Luna ($g\\approx1{,}62$) un pendolo $L=1$ m ha $T\\approx$", opts: ["$2{,}0$ s","$4{,}94$ s","$1{,}0$ s","$9{,}8$ s"], correct: 1, exp: "$T=2\\pi\\sqrt{1/1{,}62}\\approx4{,}94$ s." },
+      { q: "Pendolo $L=4$ m, $g=9{,}81$ m/s². Periodo $\\approx$", opts: ["$2{,}0$ s","$4{,}0$ s","$8{,}0$ s","$1{,}0$ s"], correct: 1, exp: "$T=2\\pi\\sqrt{4/9{,}81}\\approx4{,}01$ s." },
+      { q: "Pendolo $L=0{,}25$ m, $g=9{,}81$ m/s². Periodo $\\approx$", opts: ["$0{,}5$ s","$1{,}0$ s","$2{,}0$ s","$0{,}25$ s"], correct: 1, exp: "$T=2\\pi\\sqrt{0{,}25/9{,}81}\\approx1{,}00$ s." },
+      { q: "Con $g=9{,}81$ m/s² e $T=1$ s, la lunghezza è $L\\approx$", opts: ["$0{,}25$ m","$1$ m","$0{,}5$ m","$2$ m"], correct: 0, exp: "$L=g(T/2\\pi)^2=9{,}81/(4\\pi^2)\\approx0{,}248$ m." },
+      { q: "Pendolo $L=2{,}5$ m, $g=10$ m/s². Pulsazione $\\omega$:", opts: ["$2$ rad/s","$4$ rad/s","$0{,}25$ rad/s","$5$ rad/s"], correct: 0, exp: "$\\omega=\\sqrt{g/L}=\\sqrt{10/2{,}5}=\\sqrt4=2$ rad/s." },
+      { q: "Pendolo $L=9{,}8$ m, $g=9{,}8$ m/s². Periodo:", opts: ["$\\pi$ s","$2\\pi$ s","$1$ s","$9{,}8$ s"], correct: 1, exp: "$T=2\\pi\\sqrt{9{,}8/9{,}8}=2\\pi\\approx6{,}28$ s." },
+      { q: "Pendolo $L=1$ m con $g=4$ m/s². Periodo:", opts: ["$\\pi$ s","$2\\pi$ s","$2$ s","$4$ s"], correct: 0, exp: "$T=2\\pi\\sqrt{1/4}=2\\pi\\cdot\\tfrac12=\\pi\\approx3{,}14$ s." }
+    ]
+  },
+  7: {
+    teoria: [
+      { q: "Cosa hanno in comune molla e pendolo?", opts: ["la stessa costante $k$","la stessa equazione $\\ddot x=-\\omega^2 x$","lo stesso periodo","la stessa origine della forza"], correct: 1, exp: "Entrambi obbediscono all'equazione del MAS." },
+      { q: "Cosa cambia tra molla e pendolo?", opts: ["la forma matematica del moto","il significato fisico di $\\omega^2$","il fatto di essere periodici","nulla"], correct: 1, exp: "$\\omega^2=k/m$ per la molla, $\\omega^2=g/L$ per il pendolo." },
+      { q: "Raddoppiando la massa, i periodi:", opts: ["crescono entrambi di $\\sqrt2$","solo la molla cresce di $\\sqrt2$, il pendolo resta uguale","restano entrambi uguali","solo il pendolo cresce"], correct: 1, exp: "$T_\\text{molla}\\propto\\sqrt m$; $T_\\text{pend}$ non dipende da $m$." },
+      { q: "Il moto armonico semplice equivale geometricamente a:", opts: ["la proiezione di un MCU su un diametro","un moto uniformemente accelerato","un moto rettilineo uniforme","una caduta libera"], correct: 0, exp: "Ogni MAS è la proiezione di un MCU." },
+      { q: "La pulsazione della molla è:", opts: ["$\\sqrt{k/m}$","$\\sqrt{m/k}$","$\\sqrt{g/L}$","$k/m$"], correct: 0, exp: "$\\omega=\\sqrt{k/m}$." },
+      { q: "La pulsazione del pendolo è:", opts: ["$\\sqrt{L/g}$","$\\sqrt{g/L}$","$\\sqrt{k/m}$","$g/L$"], correct: 1, exp: "$\\omega=\\sqrt{g/L}$." },
+      { q: "Molla, pendolo e proiezione del MCU sono tutti:", opts: ["moti uniformemente accelerati","oscillatori isocroni (entro le approssimazioni)","moti circolari","moti smorzati"], correct: 1, exp: "Tutti hanno $T=2\\pi/\\omega$ indipendente dall'ampiezza (il pendolo nei piccoli angoli)." },
+      { q: "Il periodo del pendolo dipende da $g$; quello della molla:", opts: ["dipende anch'esso da $g$","non dipende da $g$","dipende da $g$ solo in verticale","è proporzionale a $g$"], correct: 1, exp: "$T_\\text{molla}=2\\pi\\sqrt{m/k}$ non contiene $g$." },
+      { q: "La forza di richiamo comune ai tre sistemi è:", opts: ["costante","proporzionale e opposta allo spostamento","proporzionale alla velocità","nulla"], correct: 1, exp: "$F\\propto-x$: è ciò che genera il MAS." },
+      { q: "Il periodo si esprime, in tutti i casi, come:", opts: ["$T=\\omega/2\\pi$","$T=2\\pi/\\omega$","$T=2\\pi\\omega$","$T=\\omega^2$"], correct: 1, exp: "$T=2\\pi/\\omega$, cambia solo cosa determina $\\omega$." }
+    ],
+    calcolo: [
+      { q: "Molla con $k=10$ N/m e $m=0{,}25$ kg. Pulsazione $\\omega\\approx$", opts: ["$6{,}32$ rad/s","$2{,}5$ rad/s","$40$ rad/s","$\\pi$ rad/s"], correct: 0, exp: "$\\omega=\\sqrt{k/m}=\\sqrt{40}\\approx6{,}32$ rad/s." },
+      { q: "Pendolo $L=2{,}5$ m, $g=10$ m/s². Pulsazione $\\omega$:", opts: ["$4$ rad/s","$2$ rad/s","$0{,}25$ rad/s","$2{,}5$ rad/s"], correct: 1, exp: "$\\omega=\\sqrt{g/L}=\\sqrt4=2$ rad/s." },
+      { q: "Per il MAS $x(t)=0{,}1\\cos(4t)$, la velocità massima è:", opts: ["$0{,}1$ m/s","$0{,}4$ m/s","$1{,}6$ m/s","$4$ m/s"], correct: 1, exp: "$v_\\max=A\\omega=0{,}1\\cdot4=0{,}4$ m/s." },
+      { q: "Per $x(t)=0{,}1\\cos(4t)$, l'accelerazione massima è:", opts: ["$0{,}4$ m/s²","$1{,}6$ m/s²","$4$ m/s²","$0{,}1$ m/s²"], correct: 1, exp: "$a_\\max=A\\omega^2=0{,}1\\cdot16=1{,}6$ m/s²." },
+      { q: "Molla con $m=2$ kg e $k=8$ N/m. Periodo:", opts: ["$\\pi/2$ s","$\\pi$ s","$2\\pi$ s","$4$ s"], correct: 1, exp: "$T=2\\pi\\sqrt{m/k}=2\\pi\\sqrt{2/8}=\\pi$ s." },
+      { q: "Pendolo $L=1$ m, $g=9{,}81$ m/s². Periodo $\\approx$", opts: ["$1{,}0$ s","$2{,}0$ s","$3{,}1$ s","$6{,}3$ s"], correct: 1, exp: "$T=2\\pi\\sqrt{1/9{,}81}\\approx2{,}01$ s." },
+      { q: "Un oscillatore ha $\\omega=5$ rad/s. Periodo:", opts: ["$\\approx1{,}26$ s","$5$ s","$\\approx0{,}8$ s","$2\\pi$ s"], correct: 0, exp: "$T=2\\pi/\\omega=2\\pi/5\\approx1{,}257$ s." },
+      { q: "Un pendolo ha $\\omega=2$ rad/s. Periodo:", opts: ["$\\pi/2$ s","$\\pi$ s","$2\\pi$ s","$4$ s"], correct: 1, exp: "$T=2\\pi/\\omega=2\\pi/2=\\pi$ s." },
+      { q: "Molla con $k=40$ N/m e $m=10$ kg. Pulsazione:", opts: ["$2$ rad/s","$4$ rad/s","$0{,}5$ rad/s","$400$ rad/s"], correct: 0, exp: "$\\omega=\\sqrt{k/m}=\\sqrt{40/10}=\\sqrt4=2$ rad/s." },
+      { q: "Molla ($k=100$, $m=1$) e pendolo ($L=1$, $g=100$): le pulsazioni...", opts: ["la molla è più veloce","il pendolo è più veloce","sono uguali ($\\omega=10$ rad/s)","non confrontabili"], correct: 2, exp: "Molla: $\\omega=\\sqrt{100/1}=10$; pendolo: $\\omega=\\sqrt{100/1}=10$. Identiche." }
+    ]
+  }
+};
+
+function renderQuizzes() {
+  document.querySelectorAll(".step").forEach(stepEl => {
+    const step = +stepEl.dataset.step;
+    const data = QUIZZES[step];
+    if (!data) return;
+    const block = document.createElement("div");
+    block.className = "quiz-block";
+    block.innerHTML = `
+      <h3>Verifica le tue conoscenze</h3>
+      <div class="quiz-tabs">
+        <button class="quiz-tab active" data-cat="teoria">Teoria</button>
+        <button class="quiz-tab" data-cat="calcolo">Calcolo</button>
+      </div>
+      <div class="quiz-stage"></div>
+      <div class="quiz-nav">
+        <button class="qbtn qprev">&larr; Indietro</button>
+        <span class="qcounter"></span>
+        <button class="qbtn qnext">Avanti &rarr;</button>
+      </div>`;
+    const state = {
+      cat: "teoria",
+      idx: { teoria: 0, calcolo: 0 },
+      answers: {
+        teoria: data.teoria.map(() => null),
+        calcolo: data.calcolo.map(() => null)
+      }
+    };
+    const stage = block.querySelector(".quiz-stage");
+    const counter = block.querySelector(".qcounter");
+    const prevBtn = block.querySelector(".qprev");
+    const nextBtn = block.querySelector(".qnext");
+    const tabs = block.querySelectorAll(".quiz-tab");
+
+    function renderQ() {
+      const list = data[state.cat];
+      const i = state.idx[state.cat];
+      const q = list[i];
+      const answered = state.answers[state.cat][i];
+      const badge = state.cat === "calcolo"
+        ? '<span class="qn calc">calcolo</span>'
+        : '<span class="qn">teoria</span>';
+      const optsHtml = q.opts.map((o, oi) => {
+        let cls = "";
+        if (answered !== null) {
+          if (oi === q.correct) cls = " ok";
+          else if (oi === answered) cls = " ko";
+        }
+        const dis = answered !== null ? " disabled" : "";
+        return `<button class="qopt${cls}" data-i="${oi}"${dis}>${String.fromCharCode(65+oi)}. ${o}</button>`;
+      }).join("");
+      let fbHtml = "";
+      if (answered !== null) {
+        const ok = answered === q.correct;
+        const head = ok ? "&#10003; Corretto. "
+          : "&#10007; Risposta esatta: " + String.fromCharCode(65+q.correct) + ". ";
+        fbHtml = `<div class="quiz-feedback ${ok ? "ok" : "ko"}">${head}${q.exp}</div>`;
+      }
+      stage.innerHTML = `
+        <div class="quiz-prompt">${badge}<strong>${i+1}.</strong> ${q.q}</div>
+        <div class="quiz-opts">${optsHtml}</div>
+        ${fbHtml}`;
+      counter.textContent = (i+1) + " / " + list.length;
+      prevBtn.disabled = i === 0;
+      nextBtn.disabled = i === list.length - 1;
+      stage.querySelectorAll(".qopt").forEach(b => {
+        b.addEventListener("click", () => {
+          if (state.answers[state.cat][i] !== null) return;
+          state.answers[state.cat][i] = +b.dataset.i;
+          renderQ();
+        });
+      });
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([stage]).catch(() => {});
+      }
+    }
+
+    tabs.forEach(tab => tab.addEventListener("click", () => {
+      state.cat = tab.dataset.cat;
+      tabs.forEach(t => t.classList.toggle("active", t === tab));
+      renderQ();
+    }));
+    prevBtn.addEventListener("click", () => {
+      if (state.idx[state.cat] > 0) { state.idx[state.cat]--; renderQ(); }
+    });
+    nextBtn.addEventListener("click", () => {
+      if (state.idx[state.cat] < data[state.cat].length - 1) { state.idx[state.cat]++; renderQ(); }
+    });
+
+    stepEl.insertBefore(block, stepEl.querySelector(".nav-bar"));
+    renderQ();
+  });
+}
+
+if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
+  MathJax.startup.promise.then(renderQuizzes);
+} else {
+  window.addEventListener("load", () => setTimeout(renderQuizzes, 200));
+}
+</script>
+</body>
+</html>
