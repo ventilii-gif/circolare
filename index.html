@@ -436,11 +436,13 @@
     <p class="lede">Se illuminiamo il punto rotante da molto lontano, la sua ombra su un diametro oscilla avanti e indietro. Quella oscillazione è il <em>moto armonico semplice</em>.</p>
     <div class="grid">
       <div class="panel">
-        <h3>Punto + ombra sul diametro orizzontale</h3>
+        <h3>Vettori $\vec r,\vec v,\vec a$ e le loro proiezioni sul diametro</h3>
         <div class="canvas-wrap"><canvas id="cv-proj" width="600" height="600"></canvas></div>
         <div class="legend">
-          <span class="l-circ">moto circolare</span>
-          <span class="l-shm">proiezione (moto armonico)</span>
+          <span class="l-circ">$\vec r$ posizione &rarr; $x$</span>
+          <span class="l-vel">$\vec v$ velocità &rarr; $v_x$</span>
+          <span class="l-acc">$\vec a$ accelerazione &rarr; $a_x$</span>
+          <span class="l-shm">ombra sul diametro</span>
         </div>
         <div class="controls">
           <div class="ctrl"><label>Ampiezza $A=r$ (m)</label><input type="range" id="s-proj-r" min="0.5" max="2" step="0.05" value="1.3"><span class="val" id="v-proj-r">1.30</span></div>
@@ -458,7 +460,11 @@
         <div class="formula">$$x(t) = r\cos(\omega t + \varphi_0)$$</div>
         <p>Questa è la definizione cinematica del <strong>moto armonico semplice</strong>: una funzione sinusoidale del tempo con</p>
         <div class="formula">$$\text{ampiezza } A = r,\quad \text{pulsazione } \omega,\quad \text{fase iniziale } \varphi_0$$</div>
-        <div class="insight"><strong>Osservazione.</strong> Cambiando solo $\varphi_0$ il moto circolare ruota di un'angolo, ma la <em>forma</em> dell'oscillazione sull'asse $x$ resta la stessa: solo trasla nel tempo.</div>
+        <p>Ma la proiezione non riguarda solo la posizione. Proiettando sul diametro anche i vettori $\vec v$ e $\vec a$ si ottengono la <em>velocità</em> e l'<em>accelerazione</em> dell'ombra:</p>
+        <div class="formula">$$v_x(t) = -r\omega\sin(\omega t + \varphi_0)$$</div>
+        <div class="formula">$$a_x(t) = -r\omega^2\cos(\omega t + \varphi_0) = -\omega^2\,x(t)$$</div>
+        <p>Nel disegno: la componente orizzontale di ciascun vettore (segmenti spessi sopra e sotto il diametro) è esattamente ciò che descrive il moto del punto rosso.</p>
+        <div class="insight"><strong>Osservazione.</strong> Cambiando solo $\varphi_0$ il moto circolare ruota di un angolo, ma la <em>forma</em> dell'oscillazione sull'asse $x$ resta la stessa: solo trasla nel tempo.</div>
       </div>
     </div>
     <div class="nav-bar">
@@ -903,25 +909,63 @@ function now() { return (performance.now() - t0) / 1000; }
     const px = cx + r*scale*Math.cos(ang);
     const py = cy - r*scale*Math.sin(ang);
 
-    // radius
-    ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 1.8;
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py); ctx.stroke();
+    // ===== three vectors anchored at P =====
+    // position vector r (blue)
+    arrow(ctx, cx, cy, px, py, "#2563eb", 2);
+    // velocity vector v (green, tangent)
+    let vLen = (w*r) * scale * 0.30;
+    vLen = Math.min(vLen, r*scale*0.85);
+    const vTipX = px - vLen*Math.sin(ang);
+    const vTipY = py - vLen*Math.cos(ang);
+    arrow(ctx, px, py, vTipX, vTipY, "#059669", 2);
+    // acceleration vector a (orange, centripetal)
+    let aLen = (w*w*r) * scale * 0.12;
+    aLen = Math.min(aLen, r*scale*0.70);
+    const aTipX = px + aLen*(cx - px)/(r*scale);
+    const aTipY = py + aLen*(cy - py)/(r*scale);
+    arrow(ctx, px, py, aTipX, aTipY, "#d97706", 2);
 
-    // projection line
-    ctx.strokeStyle = "#9ca3af"; ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+    label(ctx, "r", (cx+px)/2 + 7, (cy+py)/2 - 4, "#2563eb", 13);
+    label(ctx, "v", vTipX + 7, vTipY - 4, "#059669", 13);
+    label(ctx, "a", aTipX + 7, aTipY + 13, "#d97706", 13);
+
+    // ===== dashed projectors down to the diameter =====
+    const vLineY = cy - 24, aLineY = cy + 24;
+    ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+    ctx.strokeStyle = "#93c5fd";
     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, cy); ctx.stroke();
+    ctx.strokeStyle = "#6ee7b7";
+    ctx.beginPath(); ctx.moveTo(vTipX, vTipY); ctx.lineTo(vTipX, vLineY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, cy); ctx.lineTo(px, vLineY); ctx.stroke();
+    ctx.strokeStyle = "#fcd34d";
+    ctx.beginPath(); ctx.moveTo(aTipX, aTipY); ctx.lineTo(aTipX, aLineY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, cy); ctx.lineTo(px, aLineY); ctx.stroke();
     ctx.setLineDash([]);
+
+    // ===== projected vectors on / parallel to the diameter =====
+    // x(t): projection of r  (O -> shadow, on the diameter)
+    arrow(ctx, cx, cy, px, cy, "#2563eb", 3);
+    // vx: projection of velocity  (above the diameter)
+    arrow(ctx, px, vLineY, vTipX, vLineY, "#059669", 3);
+    // ax: projection of acceleration  (below the diameter)
+    arrow(ctx, px, aLineY, aTipX, aLineY, "#d97706", 3);
 
     // point on circle
     ctx.fillStyle = "#2563eb";
     ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI*2); ctx.fill();
     // shadow on diameter
     ctx.fillStyle = "#db2777";
-    ctx.beginPath(); ctx.arc(px, cy, 8, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, cy, 7, 0, Math.PI*2); ctx.fill();
 
-    label(ctx, "P", px + 10, py - 8, "#2563eb");
-    label(ctx, "x(t)", px - 16, cy + 22, "#db2777");
-    label(ctx, `x = ${(r*Math.cos(ang)).toFixed(3)} m`, 14, 22, "#db2777");
+    label(ctx, "P", px + 11, py - 9, "#2563eb");
+    label(ctx, "x(t)", px - 14, cy + 44, "#db2777", 12);
+
+    const xVal = r*Math.cos(ang);
+    const vVal = -r*w*Math.sin(ang);
+    const aVal = -r*w*w*Math.cos(ang);
+    label(ctx, `x  = ${xVal.toFixed(2)} m`, 14, 22, "#2563eb", 12);
+    label(ctx, `vₓ = ${vVal.toFixed(2)} m/s`, 14, 40, "#059669", 12);
+    label(ctx, `aₓ = ${aVal.toFixed(2)} m/s²`, 14, 58, "#d97706", 12);
 
     // ----- plot x(t) -----
     const pRect = cp.getBoundingClientRect();
