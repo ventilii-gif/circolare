@@ -89,13 +89,13 @@
   .stepper button.active .num {
     background: white; color: var(--ink);
   }
-  .step { display: none; }
-  .step.active { display: block; }
-  .step h2 {
+  .step, .quizpage { display: none; }
+  .step.active, .quizpage.active { display: block; }
+  .step h2, .quizpage h2 {
     font-size: 1.5rem; font-weight: 600; margin: 0 0 6px;
     letter-spacing: -0.015em;
   }
-  .step .lede {
+  .step .lede, .quizpage .lede {
     color: var(--muted); margin: 0 0 24px; font-size: 1rem;
   }
   .grid {
@@ -691,7 +691,7 @@
 
 <script>
 // ============================================================
-//  STEPPER NAVIGATION
+//  NAVIGAZIONE — lezioni e pagine quiz in sequenza
 // ============================================================
 const STEP_TITLES = [
   "MCU",
@@ -702,29 +702,62 @@ const STEP_TITLES = [
   "Pendolo",
   "Sintesi"
 ];
-const stepperEl = document.getElementById("stepper");
-STEP_TITLES.forEach((t, i) => {
-  const b = document.createElement("button");
-  b.innerHTML = `<span class="num">${i+1}</span>${t}`;
-  b.dataset.go = i+1;
-  b.addEventListener("click", () => goStep(i+1));
-  stepperEl.appendChild(b);
-});
-function goStep(n) {
-  document.querySelectorAll(".step").forEach(s => s.classList.toggle("active", +s.dataset.step === n));
-  document.querySelectorAll(".stepper button").forEach(b => b.classList.toggle("active", +b.dataset.go === n));
+const NSTEP = STEP_TITLES.length;
+const NPAGES = NSTEP * 2;
+let curPage = 0;
+// sequenza piatta: posizione pari = lezione, posizione dispari = pagina quiz
+function pageAt(p) {
+  return (p % 2 === 0) ? { type: "lesson", n: p/2 + 1 } : { type: "quiz", n: (p+1)/2 };
+}
+function showPage(p) {
+  if (p < 0 || p >= NPAGES) return;
+  curPage = p;
+  const pg = pageAt(p);
+  document.querySelectorAll(".step").forEach(s =>
+    s.classList.toggle("active", pg.type === "lesson" && +s.dataset.step === pg.n));
+  document.querySelectorAll(".quizpage").forEach(s =>
+    s.classList.toggle("active", pg.type === "quiz" && +s.dataset.quiz === pg.n));
+  document.querySelectorAll(".stepper button").forEach(b =>
+    b.classList.toggle("active", +b.dataset.go === pg.n));
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-document.querySelectorAll("[data-next]").forEach(b => b.addEventListener("click", () => {
-  const cur = +b.closest(".step").dataset.step;
-  if (cur < STEP_TITLES.length) goStep(cur + 1);
-}));
-document.querySelectorAll("[data-prev]").forEach(b => b.addEventListener("click", () => {
-  const cur = +b.closest(".step").dataset.step;
-  if (cur > 1) goStep(cur - 1);
-}));
-document.getElementById("b-restart").addEventListener("click", () => goStep(1));
-goStep(1);
+function buildStepper() {
+  const stepperEl = document.getElementById("stepper");
+  STEP_TITLES.forEach((t, i) => {
+    const b = document.createElement("button");
+    b.innerHTML = `<span class="num">${i+1}</span>${t}`;
+    b.dataset.go = i+1;
+    b.addEventListener("click", () => showPage(i*2));
+    stepperEl.appendChild(b);
+  });
+}
+function buildNav(container, p) {
+  let bar = container.querySelector(".nav-bar");
+  if (!bar) { bar = document.createElement("div"); bar.className = "nav-bar"; container.appendChild(bar); }
+  bar.innerHTML = "";
+  const prev = document.createElement("button");
+  prev.className = "ghost";
+  if (p === 0) {
+    prev.textContent = "← Indietro";
+    prev.disabled = true;
+  } else {
+    const pp = pageAt(p-1);
+    prev.textContent = pp.type === "lesson" ? "← Lezione " + pp.n : "← Quiz sezione " + pp.n;
+    prev.addEventListener("click", () => showPage(p-1));
+  }
+  const next = document.createElement("button");
+  if (p === NPAGES - 1) {
+    next.className = "ghost";
+    next.textContent = "↻ Ricomincia";
+    next.addEventListener("click", () => showPage(0));
+  } else {
+    const np = pageAt(p+1);
+    next.textContent = np.type === "quiz" ? "Quiz della sezione →" : "Lezione " + np.n + " →";
+    next.addEventListener("click", () => showPage(p+1));
+  }
+  bar.appendChild(prev);
+  bar.appendChild(next);
+}
 
 // ============================================================
 //  CANVAS HELPERS (HiDPI)
@@ -1765,103 +1798,125 @@ const QUIZZES = {
   }
 };
 
-function renderQuizzes() {
-  document.querySelectorAll(".step").forEach(stepEl => {
-    const step = +stepEl.dataset.step;
-    const data = QUIZZES[step];
-    if (!data) return;
+function wireQuiz(block, data) {
+  const state = {
+    cat: "teoria",
+    idx: { teoria: 0, calcolo: 0 },
+    answers: {
+      teoria: data.teoria.map(() => null),
+      calcolo: data.calcolo.map(() => null)
+    }
+  };
+  const stage = block.querySelector(".quiz-stage");
+  const counter = block.querySelector(".qcounter");
+  const prevBtn = block.querySelector(".qprev");
+  const nextBtn = block.querySelector(".qnext");
+  const tabs = block.querySelectorAll(".quiz-tab");
+
+  function renderQ(scroll) {
+    const list = data[state.cat];
+    const i = state.idx[state.cat];
+    const q = list[i];
+    const answered = state.answers[state.cat][i];
+    const badge = state.cat === "calcolo"
+      ? '<span class="qn calc">calcolo</span>'
+      : '<span class="qn">teoria</span>';
+    const optsHtml = q.opts.map((o, oi) => {
+      let cls = "";
+      if (answered !== null) {
+        if (oi === q.correct) cls = " ok";
+        else if (oi === answered) cls = " ko";
+      }
+      const dis = answered !== null ? " disabled" : "";
+      return `<button class="qopt${cls}" data-i="${oi}"${dis}>${String.fromCharCode(65+oi)}. ${o}</button>`;
+    }).join("");
+    let fbHtml = "";
+    if (answered !== null) {
+      const ok = answered === q.correct;
+      const head = ok ? "&#10003; Corretto. "
+        : "&#10007; Risposta esatta: " + String.fromCharCode(65+q.correct) + ". ";
+      fbHtml = `<div class="quiz-feedback ${ok ? "ok" : "ko"}">${head}${q.exp}</div>`;
+    }
+    stage.innerHTML = `
+      <div class="quiz-prompt">${badge}<strong>${i+1}.</strong> ${q.q}</div>
+      <div class="quiz-opts">${optsHtml}</div>
+      ${fbHtml}`;
+    counter.textContent = (i+1) + " / " + list.length;
+    prevBtn.disabled = i === 0;
+    nextBtn.disabled = i === list.length - 1;
+    stage.querySelectorAll(".qopt").forEach(b => {
+      b.addEventListener("click", () => {
+        if (state.answers[state.cat][i] !== null) return;
+        state.answers[state.cat][i] = +b.dataset.i;
+        renderQ(false);
+      });
+    });
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise([stage]).catch(() => {});
+    }
+    if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  tabs.forEach(tab => tab.addEventListener("click", () => {
+    state.cat = tab.dataset.cat;
+    tabs.forEach(t => t.classList.toggle("active", t === tab));
+    renderQ(true);
+  }));
+  prevBtn.addEventListener("click", () => {
+    if (state.idx[state.cat] > 0) { state.idx[state.cat]--; renderQ(true); }
+  });
+  nextBtn.addEventListener("click", () => {
+    if (state.idx[state.cat] < data[state.cat].length - 1) { state.idx[state.cat]++; renderQ(true); }
+  });
+  renderQ(false);
+}
+
+function buildQuizPages() {
+  const container = document.querySelector(".container");
+  for (let n = 1; n <= NSTEP; n++) {
+    const data = QUIZZES[n];
+    if (!data) continue;
+    const page = document.createElement("section");
+    page.className = "quizpage";
+    page.dataset.quiz = n;
+    const h2 = document.createElement("h2");
+    h2.textContent = "Quiz · " + n + ". " + STEP_TITLES[n-1];
+    page.appendChild(h2);
     const block = document.createElement("div");
     block.className = "quiz-block";
     block.innerHTML = `
-      <h3>Verifica le tue conoscenze</h3>
       <div class="quiz-tabs">
         <button class="quiz-tab active" data-cat="teoria">Teoria</button>
         <button class="quiz-tab" data-cat="calcolo">Calcolo</button>
       </div>
       <div class="quiz-stage"></div>
       <div class="quiz-nav">
-        <button class="qbtn qprev">&larr; Indietro</button>
+        <button class="qbtn qprev">&larr; Domanda precedente</button>
         <span class="qcounter"></span>
-        <button class="qbtn qnext">Avanti &rarr;</button>
+        <button class="qbtn qnext">Domanda successiva &rarr;</button>
       </div>`;
-    const state = {
-      cat: "teoria",
-      idx: { teoria: 0, calcolo: 0 },
-      answers: {
-        teoria: data.teoria.map(() => null),
-        calcolo: data.calcolo.map(() => null)
-      }
-    };
-    const stage = block.querySelector(".quiz-stage");
-    const counter = block.querySelector(".qcounter");
-    const prevBtn = block.querySelector(".qprev");
-    const nextBtn = block.querySelector(".qnext");
-    const tabs = block.querySelectorAll(".quiz-tab");
-
-    function renderQ() {
-      const list = data[state.cat];
-      const i = state.idx[state.cat];
-      const q = list[i];
-      const answered = state.answers[state.cat][i];
-      const badge = state.cat === "calcolo"
-        ? '<span class="qn calc">calcolo</span>'
-        : '<span class="qn">teoria</span>';
-      const optsHtml = q.opts.map((o, oi) => {
-        let cls = "";
-        if (answered !== null) {
-          if (oi === q.correct) cls = " ok";
-          else if (oi === answered) cls = " ko";
-        }
-        const dis = answered !== null ? " disabled" : "";
-        return `<button class="qopt${cls}" data-i="${oi}"${dis}>${String.fromCharCode(65+oi)}. ${o}</button>`;
-      }).join("");
-      let fbHtml = "";
-      if (answered !== null) {
-        const ok = answered === q.correct;
-        const head = ok ? "&#10003; Corretto. "
-          : "&#10007; Risposta esatta: " + String.fromCharCode(65+q.correct) + ". ";
-        fbHtml = `<div class="quiz-feedback ${ok ? "ok" : "ko"}">${head}${q.exp}</div>`;
-      }
-      stage.innerHTML = `
-        <div class="quiz-prompt">${badge}<strong>${i+1}.</strong> ${q.q}</div>
-        <div class="quiz-opts">${optsHtml}</div>
-        ${fbHtml}`;
-      counter.textContent = (i+1) + " / " + list.length;
-      prevBtn.disabled = i === 0;
-      nextBtn.disabled = i === list.length - 1;
-      stage.querySelectorAll(".qopt").forEach(b => {
-        b.addEventListener("click", () => {
-          if (state.answers[state.cat][i] !== null) return;
-          state.answers[state.cat][i] = +b.dataset.i;
-          renderQ();
-        });
-      });
-      if (window.MathJax && MathJax.typesetPromise) {
-        MathJax.typesetPromise([stage]).catch(() => {});
-      }
-    }
-
-    tabs.forEach(tab => tab.addEventListener("click", () => {
-      state.cat = tab.dataset.cat;
-      tabs.forEach(t => t.classList.toggle("active", t === tab));
-      renderQ();
-    }));
-    prevBtn.addEventListener("click", () => {
-      if (state.idx[state.cat] > 0) { state.idx[state.cat]--; renderQ(); }
-    });
-    nextBtn.addEventListener("click", () => {
-      if (state.idx[state.cat] < data[state.cat].length - 1) { state.idx[state.cat]++; renderQ(); }
-    });
-
-    stepEl.insertBefore(block, stepEl.querySelector(".nav-bar"));
-    renderQ();
-  });
+    page.appendChild(block);
+    container.appendChild(page);
+    wireQuiz(block, data);
+    buildNav(page, 2*n - 1);
+  }
 }
 
+// ============================================================
+//  INIT
+// ============================================================
+buildStepper();
+buildQuizPages();
+document.querySelectorAll(".step").forEach(s => buildNav(s, (+s.dataset.step - 1) * 2));
+showPage(0);
+
+function typesetAll() {
+  if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise().catch(() => {});
+}
 if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
-  MathJax.startup.promise.then(renderQuizzes);
+  MathJax.startup.promise.then(typesetAll);
 } else {
-  window.addEventListener("load", () => setTimeout(renderQuizzes, 200));
+  window.addEventListener("load", () => setTimeout(typesetAll, 300));
 }
 </script>
 </body>
