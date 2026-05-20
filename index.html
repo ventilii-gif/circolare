@@ -387,6 +387,29 @@
     font-variant-numeric: tabular-nums;
     font-weight: 600;
   }
+  .quiz-summary { padding: 4px 0; }
+  .quiz-summary h3 {
+    margin: 0 0 16px; font-size: 1.1rem; font-weight: 600; color: var(--ink);
+  }
+  .qs-row {
+    display: flex; justify-content: space-between;
+    padding: 9px 4px; font-size: 0.95rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .qs-row span { color: var(--muted); }
+  .qs-row strong { font-variant-numeric: tabular-nums; }
+  .qs-total { border-bottom: none; font-size: 1.05rem; }
+  .qs-total span, .qs-total strong { color: var(--ink); font-weight: 700; }
+  .qs-bar {
+    height: 10px; background: #eef0f3; border-radius: 999px;
+    overflow: hidden; margin: 16px 0 14px;
+  }
+  .qs-fill { height: 100%; border-radius: 999px; transition: width 0.4s; }
+  .qs-level {
+    font-size: 1rem; font-weight: 600;
+    padding: 12px 16px; border-radius: 8px;
+  }
+  .qs-note { margin: 12px 0 0; font-size: 0.85rem; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -1802,6 +1825,7 @@ function wireQuiz(block, data) {
   const state = {
     cat: "teoria",
     idx: { teoria: 0, calcolo: 0 },
+    summary: false,
     answers: {
       teoria: data.teoria.map(() => null),
       calcolo: data.calcolo.map(() => null)
@@ -1813,7 +1837,64 @@ function wireQuiz(block, data) {
   const nextBtn = block.querySelector(".qnext");
   const tabs = block.querySelectorAll(".quiz-tab");
 
+  function scoreOf(cat) {
+    return state.answers[cat].reduce(
+      (s, a, i) => s + (a !== null && a === data[cat][i].correct ? 1 : 0), 0);
+  }
+  function answeredOf(cat) {
+    return state.answers[cat].filter(a => a !== null).length;
+  }
+  function summaryHTML() {
+    const tS = scoreOf("teoria"), cS = scoreOf("calcolo");
+    const tot = tS + cS;
+    const ans = answeredOf("teoria") + answeredOf("calcolo");
+    const pct = tot / 20;
+    let col, bg, lvl;
+    if (tot === 20) {
+      col = "#059669"; bg = "#ecfdf5";
+      lvl = "Perfetto · 20 / 20: padronanza totale dell'argomento.";
+    } else if (pct >= 0.85) {
+      col = "#059669"; bg = "#ecfdf5";
+      lvl = "Eccellente — hai una solida padronanza dell'argomento.";
+    } else if (pct >= 0.6) {
+      col = "#2563eb"; bg = "#dbeafe";
+      lvl = "Buono — i concetti chiave sono acquisiti, rifinisci i dettagli.";
+    } else if (pct >= 0.4) {
+      col = "#d97706"; bg = "#fff7ed";
+      lvl = "Sufficiente — conviene rivedere la lezione sui punti incerti.";
+    } else {
+      col = "#dc2626"; bg = "#fef2f2";
+      lvl = "Da rivedere — rileggi la lezione e riprova il quiz.";
+    }
+    const note = ans < 20
+      ? `<p class="qs-note">Hai risposto a ${ans} domande su 20. Le domande non risposte contano come errate nel punteggio.</p>`
+      : "";
+    return `
+      <div class="quiz-summary">
+        <h3>Riepilogo del quiz</h3>
+        <div class="qs-row"><span>Teoria</span><strong>${tS} / 10</strong></div>
+        <div class="qs-row"><span>Calcolo</span><strong>${cS} / 10</strong></div>
+        <div class="qs-row qs-total"><span>Totale</span><strong>${tot} / 20</strong></div>
+        <div class="qs-bar"><div class="qs-fill" style="width:${Math.round(pct*100)}%;background:${col};"></div></div>
+        <div class="qs-level" style="background:${bg};color:${col};">${lvl}</div>
+        ${note}
+      </div>`;
+  }
+
   function renderQ(scroll) {
+    if (state.summary) {
+      stage.innerHTML = summaryHTML();
+      counter.textContent = "Riepilogo";
+      prevBtn.disabled = false;
+      prevBtn.textContent = "← Torna alle domande";
+      nextBtn.disabled = false;
+      nextBtn.textContent = "↺ Ripeti il quiz";
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([stage]).catch(() => {});
+      }
+      if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     const list = data[state.cat];
     const i = state.idx[state.cat];
     const q = list[i];
@@ -1843,7 +1924,9 @@ function wireQuiz(block, data) {
       ${fbHtml}`;
     counter.textContent = (i+1) + " / " + list.length;
     prevBtn.disabled = i === 0;
-    nextBtn.disabled = i === list.length - 1;
+    prevBtn.textContent = "← Domanda precedente";
+    nextBtn.disabled = false;
+    nextBtn.textContent = (i === list.length - 1) ? "Riepilogo →" : "Domanda successiva →";
     stage.querySelectorAll(".qopt").forEach(b => {
       b.addEventListener("click", () => {
         if (state.answers[state.cat][i] !== null) return;
@@ -1858,15 +1941,35 @@ function wireQuiz(block, data) {
   }
 
   tabs.forEach(tab => tab.addEventListener("click", () => {
+    state.summary = false;
     state.cat = tab.dataset.cat;
     tabs.forEach(t => t.classList.toggle("active", t === tab));
     renderQ(true);
   }));
   prevBtn.addEventListener("click", () => {
+    if (state.summary) { state.summary = false; renderQ(true); return; }
     if (state.idx[state.cat] > 0) { state.idx[state.cat]--; renderQ(true); }
   });
   nextBtn.addEventListener("click", () => {
-    if (state.idx[state.cat] < data[state.cat].length - 1) { state.idx[state.cat]++; renderQ(true); }
+    if (state.summary) {
+      state.summary = false;
+      state.cat = "teoria";
+      state.idx.teoria = 0;
+      state.idx.calcolo = 0;
+      state.answers.teoria = data.teoria.map(() => null);
+      state.answers.calcolo = data.calcolo.map(() => null);
+      tabs.forEach(t => t.classList.toggle("active", t.dataset.cat === "teoria"));
+      renderQ(true);
+      return;
+    }
+    const list = data[state.cat];
+    if (state.idx[state.cat] < list.length - 1) {
+      state.idx[state.cat]++;
+      renderQ(true);
+    } else {
+      state.summary = true;
+      renderQ(true);
+    }
   });
   renderQ(false);
 }
