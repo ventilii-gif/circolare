@@ -449,7 +449,7 @@
         <p>$T$ è il <strong>periodo</strong> (tempo di un giro), $f$ la <strong>frequenza</strong> (giri al secondo, Hz), $v$ la velocità tangenziale.</p>
         <p>L'accelerazione è puramente <em>centripeta</em>, sempre diretta verso il centro:</p>
         <div class="formula">$$a_c = \dfrac{v^2}{r} = \omega^2 r$$</div>
-        <div class="insight"><strong>Idea chiave.</strong> Il moto è uniforme nel modulo della velocità, ma <em>non</em> nel vettore: la direzione cambia continuamente, e questa è la ragione fisica per cui esiste un'accelerazione.</div>
+        <div class="insight"><strong>Idea chiave.</strong> Il moto è uniforme nel modulo della velocità, ma <em>non</em> nel vettore: la direzione cambia continuamente, e questa è la ragione fisica per cui esiste un'accelerazione. Il vettore verde $\vec v$ è sempre tangente alla circonferenza.</div>
       </div>
     </div>
     <div class="nav-bar">
@@ -867,6 +867,14 @@ function now() { return (performance.now() - t0) / 1000; }
     const py = cy - r*scale*Math.sin(phase);
     // radius
     arrow(ctx, cx, cy, px, py, "#2563eb", 2.2);
+    label(ctx, "r", (cx+px)/2 + 8, (cy+py)/2 + 4, "#2563eb", 13);
+    // tangential velocity vector (green): perpendicular to r, in the verse of motion
+    let vLen = (w*r) * scale * 0.30;
+    vLen = Math.min(vLen, r*scale*0.9);
+    const vx = px - vLen*Math.sin(phase);
+    const vy = py - vLen*Math.cos(phase);
+    arrow(ctx, px, py, vx, vy, "#059669", 2.2);
+    label(ctx, "v", vx + 8, vy - 4, "#059669", 13);
     // angle arc
     ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.arc(cx, cy, 26, 0, -phase, true); ctx.stroke();
@@ -879,7 +887,8 @@ function now() { return (performance.now() - t0) / 1000; }
     label(ctx, "O", cx - 14, cy + 16, "#64748b");
     label(ctx, "P", px + 10, py - 8, "#1a1a1a");
     label(ctx, `r = ${r.toFixed(2)} m`, 14, 22, "#2563eb");
-    label(ctx, `ω = ${w.toFixed(2)} rad/s   T = ${(2*Math.PI/w).toFixed(2)} s   v = ${(w*r).toFixed(2)} m/s`, 14, 42, "#64748b");
+    label(ctx, `v = ω·r = ${(w*r).toFixed(2)} m/s  (tangente)`, 14, 42, "#059669");
+    label(ctx, `ω = ${w.toFixed(2)} rad/s   T = ${(2*Math.PI/w).toFixed(2)} s`, 14, 62, "#64748b");
 
     requestAnimationFrame(draw);
   }
